@@ -64,12 +64,20 @@ def format_retrieved_memories(documents) -> str:
     formatted = "=== RELEVANT PAST CONVERSATIONS ===\n\n"
     
     for i, doc in enumerate(documents, 1):
-        meta = doc.get('metadata', {})
-        timestamp = meta.get('timestamp', 'Unknown')[:10]
-        score = meta.get('score', 0)
+        # Handle different document formats
+        if hasattr(doc, 'metadata'):
+            meta = doc.metadata
+            content = doc.page_content
+        elif isinstance(doc, dict):
+            meta = doc.get('metadata', {})
+            content = doc.get('page_content', doc.get('content', ''))
+        else:
+            continue
+            
+        timestamp = meta.get('timestamp', 'Unknown')[:10] if isinstance(meta, dict) else 'Unknown'
+        score = meta.get('score', 0) if isinstance(meta, dict) else 0
         
         formatted += f"[Memory {i}] ({timestamp}, relevance: {score:.2f})\n"
-        content = doc.get('page_content', doc.get('content', ''))
         formatted += f"{content[:400]}...\n\n"
     
     return formatted
