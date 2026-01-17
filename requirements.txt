@@ -2,5 +2,4 @@ streamlit
 anthropic
 sentence-transformers
 psycopg2-binary
-numpy
 pgvector
