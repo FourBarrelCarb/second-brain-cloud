@@ -70,8 +70,7 @@ def save_conversation(messages: list, conversation_id: str = None, metadata: dic
         
         result_id = db.execute_insert(
             query,
-            (title, transcript, embedding_str, json.dumps(conv_metadata)),
-            return_id=True
+            (title, transcript, embedding_str, json.dumps(conv_metadata))
         )
         
         if result_id:
