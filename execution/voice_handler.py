@@ -27,13 +27,13 @@ class VoiceHandler:
             logger.error(f"Failed to initialize voice handler: {e}")
             raise
     
-    def transcribe_audio(self, audio_bytes: bytes, audio_format: str = "webm") -> Optional[str]:
+    def transcribe_audio(self, audio_bytes: bytes, audio_format: str = "wav") -> Optional[str]:
         """
         Transcribe audio using Whisper API.
         
         Args:
             audio_bytes: Raw audio data
-            audio_format: Audio format (webm, mp3, wav, etc.)
+            audio_format: Audio format (wav, webm, mp3, etc.)
             
         Returns:
             Transcribed text or None on error
@@ -46,8 +46,7 @@ class VoiceHandler:
             # Call Whisper API
             transcript = self.client.audio.transcriptions.create(
                 model="whisper-1",
-                file=audio_file,
-                language="en"  # Can be removed for auto-detection
+                file=audio_file
             )
             
             transcribed_text = transcript.text
@@ -56,7 +55,7 @@ class VoiceHandler:
             return transcribed_text
             
         except Exception as e:
-            logger.error(f"Transcription error: {e}")
+            logger.error(f"Transcription error: {e}", exc_info=True)
             return None
     
     def get_audio_duration_estimate(self, audio_bytes: bytes) -> float:
