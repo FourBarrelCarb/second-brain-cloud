@@ -1,17 +1,20 @@
 """
-Second Brain - Cloud-Native Application
-Complete AI assistant with perfect memory, accessible from any device
+Second Brain "Athena" - Cloud-Native Application with Voice
+Complete AI assistant with perfect memory and voice capabilities
 """
 
 import streamlit as st
 from datetime import datetime
 from uuid import uuid4
 import logging
+import base64
 
 # Import execution modules
 from execution.retrieve_chats import hybrid_retrieve
 from execution.save_conversation import save_conversation
 from execution.call_claude import get_claude_client
+from execution.voice_handler import get_voice_handler, create_tts_audio
+from execution.audio_recorder import audio_recorder_component
 
 # Setup logging
 logging.basicConfig(
@@ -25,7 +28,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 st.set_page_config(
-    page_title="Second Brain",
+    page_title="Second Brain - Athena",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -51,6 +54,13 @@ def init_session_state():
     
     if "total_cost" not in st.session_state:
         st.session_state.total_cost = 0.0
+    
+    # Voice mode settings
+    if "voice_mode" not in st.session_state:
+        st.session_state.voice_mode = False
+    
+    if "voice_cost" not in st.session_state:
+        st.session_state.voice_cost = 0.0
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -94,6 +104,46 @@ def count_tokens_approx(text: str) -> int:
     """Approximate token count (~1.3 tokens per word)."""
     return int(len(text.split()) * 1.3)
 
+
+def process_voice_input() -> str:
+    """
+    Handle voice input recording and transcription.
+    Returns transcribed text or empty string.
+    """
+    st.subheader("🎤 Voice Input")
+    
+    # Audio recorder component
+    audio_data = audio_recorder_component(key="voice_recorder")
+    
+    if audio_data:
+        try:
+            # Decode base64 audio
+            audio_bytes = base64.b64decode(audio_data)
+            
+            # Show processing message
+            with st.spinner("Transcribing audio..."):
+                voice_handler = get_voice_handler()
+                transcribed_text = voice_handler.transcribe_audio(audio_bytes, "webm")
+                
+                # Calculate cost
+                voice_cost = voice_handler.estimate_transcription_cost(audio_bytes)
+                st.session_state.voice_cost += voice_cost
+                
+                if transcribed_text:
+                    st.success(f"✓ Transcribed: {transcribed_text}")
+                    st.caption(f"Voice cost: ${voice_cost:.4f}")
+                    return transcribed_text
+                else:
+                    st.error("Failed to transcribe audio")
+                    return ""
+                    
+        except Exception as e:
+            logger.error(f"Voice input error: {e}")
+            st.error(f"Voice processing error: {e}")
+            return ""
+    
+    return ""
+
 # =============================================================================
 # MAIN APPLICATION
 # =============================================================================
@@ -104,8 +154,8 @@ def main():
     init_session_state()
     
     # Title
-    st.title("🧠 Second Brain")
-    st.caption("Your AI assistant with perfect memory • Accessible from any device")
+    st.title("🧠 Athena - Your Second Brain")
+    st.caption("Perfect memory • Voice enabled • Accessible from any device")
     
     # =========================================================================
     # SIDEBAR
@@ -118,7 +168,25 @@ def main():
         st.metric("Conversation", st.session_state.conversation_id[:8] + "...")
         st.metric("Turns", st.session_state.turn_number)
         st.metric("Tokens", f"{st.session_state.total_tokens:,}")
-        st.metric("Cost", f"${st.session_state.total_cost:.4f}")
+        st.metric("Claude Cost", f"${st.session_state.total_cost:.4f}")
+        st.metric("Voice Cost", f"${st.session_state.voice_cost:.4f}")
+        st.metric("Total Cost", f"${(st.session_state.total_cost + st.session_state.voice_cost):.4f}")
+        
+        st.divider()
+        
+        # Voice Mode Toggle
+        st.subheader("🎤 Voice Mode")
+        voice_enabled = st.toggle(
+            "Enable Voice", 
+            value=st.session_state.voice_mode,
+            help="Turn on voice input and output"
+        )
+        st.session_state.voice_mode = voice_enabled
+        
+        if voice_enabled:
+            st.success("✓ Voice mode active")
+        else:
+            st.info("Voice mode off")
         
         st.divider()
         
@@ -152,6 +220,7 @@ def main():
                 st.session_state.turn_number = 0
                 st.session_state.total_tokens = 0
                 st.session_state.total_cost = 0.0
+                # Keep voice_cost running total
                 st.rerun()
         
         with col2:
@@ -181,6 +250,7 @@ def main():
         # System info
         with st.expander("⚙️ System Info", expanded=False):
             st.caption("**Model:** Claude Sonnet 4")
+            st.caption("**Voice:** Whisper + Browser TTS")
             st.caption(f"**Retrieval:** Top {st.secrets.get('RETRIEVAL_TOP_K', 6)}")
             st.caption(f"**Context:** Last {st.secrets.get('SESSION_HISTORY_LIMIT', 10)} turns")
             st.caption(f"**Recency:** {st.secrets.get('RECENCY_BOOST_DAYS', 7)} days")
@@ -189,9 +259,9 @@ def main():
         
         # Tips
         st.caption("💡 **Tips:**")
-        st.caption("• All conversations saved automatically")
-        st.caption("• Ask about past discussions")
-        st.caption("• Works on all your devices")
+        st.caption("• Toggle voice mode above")
+        st.caption("• All conversations auto-saved")
+        st.caption("• Works on all devices")
     
     # =========================================================================
     # CHAT INTERFACE
@@ -202,8 +272,15 @@ def main():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
     
-    # Chat input
-    if prompt := st.chat_input("Ask me anything... I remember everything"):
+    # Voice Input Mode
+    if st.session_state.voice_mode:
+        prompt = process_voice_input()
+    else:
+        # Text Input Mode
+        prompt = st.chat_input("Ask me anything... I remember everything")
+    
+    # Process input (text or voice)
+    if prompt:
         st.session_state.turn_number += 1
         
         # Add user message
@@ -239,7 +316,7 @@ def main():
                 retrieved_memories = format_retrieved_memories(retrieved_docs)
                 
                 # Step 2: Build system prompt with context
-                system_prompt = f"""You are a helpful AI assistant with perfect memory of all past conversations.
+                system_prompt = f"""You are Athena, a helpful AI assistant with perfect memory of all past conversations.
 
 {retrieved_memories}
 
@@ -282,7 +359,14 @@ Be helpful, concise, and build on our conversation history."""
                 message_placeholder.markdown(full_response)
                 status_placeholder.empty()
                 
-                # Step 5: Calculate tokens and cost
+                # Step 5: Voice output if enabled
+                if st.session_state.voice_mode:
+                    st.components.v1.html(
+                        create_tts_audio(full_response),
+                        height=0
+                    )
+                
+                # Step 6: Calculate tokens and cost
                 input_tokens = count_tokens_approx(prompt + retrieved_memories)
                 output_tokens = count_tokens_approx(full_response)
                 total_tokens = input_tokens + output_tokens
@@ -292,7 +376,7 @@ Be helpful, concise, and build on our conversation history."""
                 st.session_state.total_tokens += total_tokens
                 st.session_state.total_cost += cost
                 
-                # Step 6: Add assistant response to history
+                # Step 7: Add assistant response to history
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": full_response
@@ -313,7 +397,7 @@ Be helpful, concise, and build on our conversation history."""
 
 if __name__ == "__main__":
     try:
-        logger.info("Starting Second Brain...")
+        logger.info("Starting Athena...")
         main()
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
@@ -321,5 +405,5 @@ if __name__ == "__main__":
             "Failed to start application. Please check:\n\n"
             "1. Streamlit secrets are configured\n"
             "2. Database connection is valid\n"
-            "3. API key is correct"
+            "3. API keys are correct"
         )
