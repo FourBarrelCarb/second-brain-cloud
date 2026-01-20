@@ -114,19 +114,33 @@ def create_tts_audio(text: str) -> str:
     Returns:
         JavaScript code for speech synthesis
     """
-    # Escape quotes in text
-    safe_text = text.replace('"', '\\"').replace("'", "\\'")
+    # Escape quotes and newlines in text
+    safe_text = text.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'").replace('\n', ' ')
+    
+    # Limit text length for TTS (browsers have limits)
+    if len(safe_text) > 1000:
+        safe_text = safe_text[:1000] + "..."
     
     js_code = f"""
     <script>
-    function speak() {{
+    (function() {{
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
+        
+        // Create utterance
         const utterance = new SpeechSynthesisUtterance("{safe_text}");
-        utterance.rate = 1.0;
+        utterance.rate = 0.9;
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
-        window.speechSynthesis.speak(utterance);
-    }}
-    speak();
+        
+        // Wait a moment then speak (helps with Safari)
+        setTimeout(function() {{
+            window.speechSynthesis.speak(utterance);
+        }}, 100);
+        
+        // Log for debugging
+        console.log("Athena speaking:", "{safe_text}".substring(0, 50) + "...");
+    }})();
     </script>
     """
     
