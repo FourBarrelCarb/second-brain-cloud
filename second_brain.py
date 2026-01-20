@@ -7,7 +7,6 @@ import streamlit as st
 from datetime import datetime
 from uuid import uuid4
 import logging
-import base64
 
 # Import execution modules
 from execution.retrieve_chats import hybrid_retrieve
@@ -117,16 +116,13 @@ def process_voice_input() -> str:
     
     if audio_data:
         try:
-            # Decode base64 audio
-            audio_bytes = base64.b64decode(audio_data)
-            
             # Show processing message
             with st.spinner("Transcribing audio..."):
                 voice_handler = get_voice_handler()
-                transcribed_text = voice_handler.transcribe_audio(audio_bytes, "webm")
+                transcribed_text = voice_handler.transcribe_audio(audio_data, "wav")
                 
                 # Calculate cost
-                voice_cost = voice_handler.estimate_transcription_cost(audio_bytes)
+                voice_cost = voice_handler.estimate_transcription_cost(audio_data)
                 st.session_state.voice_cost += voice_cost
                 
                 if transcribed_text:
@@ -138,7 +134,7 @@ def process_voice_input() -> str:
                     return ""
                     
         except Exception as e:
-            logger.error(f"Voice input error: {e}")
+            logger.error(f"Voice input error: {e}", exc_info=True)
             st.error(f"Voice processing error: {e}")
             return ""
     
