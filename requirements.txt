@@ -3,3 +3,4 @@ anthropic
 sentence-transformers
 psycopg2-binary>=2.9.10
 pgvector
+openai
