@@ -61,7 +61,7 @@ class DatabaseManager:
         try:
             conn = self._pool.getconn()
             yield conn
-            conn.commit()  # Commit any changes
+            conn.commit()  # CRITICAL: Commit before returning to pool
             
         except psycopg2.Error as e:
             if conn:
@@ -137,11 +137,14 @@ class DatabaseManager:
             logger.info("✓ Database connection pool closed")
 
 
-# Global database manager with caching
+# CRITICAL: Global database manager with caching
 @st.cache_resource
 def get_db_manager():
     """
     Get or create the global database manager instance.
     Cached by Streamlit so only one pool exists per session.
+    
+    THIS DECORATOR IS CRITICAL - Without it, a new pool is created
+    for every request, causing connection leaks and failures.
     """
     return DatabaseManager()
