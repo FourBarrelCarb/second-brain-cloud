@@ -87,7 +87,7 @@ def format_retrieved_memories(documents) -> str:
         score = meta.get('score', 0) if isinstance(meta, dict) else 0
         
         formatted += f"[Memory {i}] ({timestamp}, relevance: {score:.2f})\n"
-        formatted += f"{content[:400]}...\n\n"
+        formatted += f"{content}\n\n"  # FIXED: Send full content, not truncated
     
     return formatted
 
