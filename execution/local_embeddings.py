@@ -10,6 +10,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class EmbeddingsWrapper:
+    """Wrapper to make SentenceTransformer compatible with our code."""
+    
+    def __init__(self, model):
+        self.model = model
+    
+    def embed_query(self, text: str):
+        """Embed a single query text."""
+        return self.model.encode(text, convert_to_numpy=True).tolist()
+    
+    def embed_documents(self, texts: list):
+        """Embed multiple documents."""
+        return [self.model.encode(text, convert_to_numpy=True).tolist() for text in texts]
+
+
 @st.cache_resource
 def get_embeddings():
     """
@@ -24,4 +39,4 @@ def get_embeddings():
     logger.info("Loading embeddings model...")
     model = SentenceTransformer('BAAI/bge-small-en-v1.5')
     logger.info("✓ Embeddings model loaded")
-    return model
+    return EmbeddingsWrapper(model)
