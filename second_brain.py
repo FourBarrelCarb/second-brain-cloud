@@ -70,6 +70,14 @@ def format_retrieved_memories(documents) -> str:
     if not documents:
         return "No relevant past conversations found."
     
+    # DEBUG: Log what we retrieved
+    logger.info(f"Formatting {len(documents)} retrieved documents")
+    for i, doc in enumerate(documents, 1):
+        if hasattr(doc, 'metadata'):
+            title = doc.metadata.get('title', 'Untitled')[:50]
+            score = doc.metadata.get('score', 0)
+            logger.info(f"  Doc {i}: {title}... (score: {score:.3f})")
+    
     formatted = "=== RELEVANT PAST CONVERSATIONS ===\n\n"
     
     for i, doc in enumerate(documents, 1):
@@ -85,10 +93,13 @@ def format_retrieved_memories(documents) -> str:
             
         timestamp = meta.get('timestamp', 'Unknown')[:10] if isinstance(meta, dict) else 'Unknown'
         score = meta.get('score', 0) if isinstance(meta, dict) else 0
+        title = meta.get('title', 'Untitled')
         
         formatted += f"[Memory {i}] ({timestamp}, relevance: {score:.2f})\n"
-        formatted += f"{content}\n\n"  # FIXED: Send full content, not truncated
+        formatted += f"Title: {title}\n"
+        formatted += f"{content}\n\n"
     
+    logger.info(f"Total formatted memory length: {len(formatted)} characters")
     return formatted
 
 
