@@ -9,7 +9,7 @@ from uuid import uuid4
 import logging
 
 # Import execution modules
-from execution.retrieve_chats import hybrid_retrieve
+#from execution.retrieve_chats import hybrid_retrieve
 from execution.save_conversation import save_conversation
 from execution.call_claude import get_claude_client
 from execution.voice_handler import get_voice_handler, create_tts_audio
