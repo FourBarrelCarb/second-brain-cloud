@@ -33,6 +33,43 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+
+# =============================================================================
+
+def reembed_all_conversations():
+    from execution.db_manager import get_db_manager
+    from execution.local_embeddings import get_embeddings
+
+    db = get_db_manager()
+    embeddings = get_embeddings()
+
+    rows = db.execute_query("""
+        SELECT id, full_transcript
+        FROM conversations
+        WHERE embedding IS NULL
+    """)
+
+    st.info(f"Found {len(rows)} conversations to re-embed")
+
+    for i, row in enumerate(rows, 1):
+        emb = embeddings.embed_query(row["full_transcript"])
+        emb_str = "[" + ",".join(map(str, emb)) + "]"
+
+        db.execute("""
+            UPDATE conversations
+            SET embedding = %s::vector
+            WHERE id = %s
+        """, (emb_str, row["id"]))
+
+        st.write(f"[{i}/{len(rows)}] Re-embedded {row['id']}")
+
+    st.success("✅ Memory re-embedding complete")
+
+st.sidebar.markdown("### Admin Tools")
+
+if st.sidebar.button("🧠 Rebuild Memory Index"):
+    reembed_all_conversations()
+
 # =============================================================================
 # SESSION STATE INITIALIZATION
 # =============================================================================
