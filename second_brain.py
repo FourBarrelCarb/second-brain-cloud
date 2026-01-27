@@ -38,18 +38,25 @@ st.set_page_config(
 # =============================================================================
 # ADMIN: ONE-TIME MEMORY RE-EMBED
 # =============================================================================
-def reembed_all_conversations():
-    st.error("🚨 DEBUG: reembed_all_conversations CALLED")
+# =============================================================================
+# ADMIN: ONE-TIME MEMORY RE-EMBED (SAFE)
+# =============================================================================
 
+def reembed_all_conversations():
+    """
+    One-time utility to rebuild missing embeddings.
+    Safe: does not affect chat, retrieval, or session state.
+    """
+    import streamlit as st
     from execution.db_manager import get_db_manager
     from execution.local_embeddings import get_embeddings
-    ...
 
     st.warning("⚠️ Rebuilding memory embeddings. This runs once and is safe.")
 
     db = get_db_manager()
     embeddings = get_embeddings()
 
+    # Fetch rows that need embeddings
     rows = db.execute_query("""
         SELECT id, full_transcript
         FROM conversations
@@ -60,33 +67,33 @@ def reembed_all_conversations():
         st.info("No conversations need re-embedding.")
         return
 
-    progress = st.progress(0)
     total = len(rows)
+    progress = st.progress(0)
 
-for i, row in enumerate(rows, 1):
-    try:
-        emb = embeddings.embed_query(row["full_transcript"])
-        emb_str = "[" + ",".join(map(str, emb)) + "]"
+    for i, row in enumerate(rows, 1):
+        try:
+            # Generate embedding (384-dim vector)
+            emb = embeddings.embed_query(row["full_transcript"])
+            emb_str = "[" + ",".join(map(str, emb)) + "]"
 
-        with db.get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE conversations
-                    SET embedding = %s::vector
-                    WHERE id = %s
-                """, (emb_str, row["id"]))
+            # 🔴 IMPORTANT: raw cursor write (NO fetch)
+            with db.get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE conversations
+                        SET embedding = %s::vector
+                        WHERE id = %s
+                        """,
+                        (emb_str, row["id"])
+                    )
 
-        progress.progress(i / total)
+            progress.progress(i / total)
 
-    except Exception as e:
-        st.error(f"Failed to re-embed {row['id']}: {e}")
-
+        except Exception as e:
+            st.error(f"Failed to re-embed {row['id']}: {e}")
 
     st.success("✅ Memory re-embedding complete")
-
-# ---- ADMIN BUTTON (TOP-LEVEL, SAFE) ----
-if st.sidebar.button("🧠 Rebuild Memory Index"):
-    reembed_all_conversations()
 
 
 # =============================================================================
