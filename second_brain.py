@@ -232,7 +232,7 @@ def main():
         
         st.divider()
 
-                st.divider()
+        st.divider()
         st.subheader("🛠 Admin Tools")
 
         if st.button("🧠 Rebuild Memory Index"):
