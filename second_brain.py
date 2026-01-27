@@ -68,11 +68,12 @@ def reembed_all_conversations():
             emb = embeddings.embed_query(row["full_transcript"])
             emb_str = "[" + ",".join(map(str, emb)) + "]"
 
-            db.execute("""
-                UPDATE conversations
-                SET embedding = %s::vector
-                WHERE id = %s
-            """, (emb_str, row["id"]))
+            db.execute_query("""
+    UPDATE conversations
+    SET embedding = %s::vector
+    WHERE id = %s
+""", (emb_str, row["id"]))
+
 
             progress.progress(i / total)
 
