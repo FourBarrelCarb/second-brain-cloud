@@ -63,21 +63,24 @@ def reembed_all_conversations():
     progress = st.progress(0)
     total = len(rows)
 
-    for i, row in enumerate(rows, 1):
-        try:
-            emb = embeddings.embed_query(row["full_transcript"])
-            emb_str = "[" + ",".join(map(str, emb)) + "]"
+for i, row in enumerate(rows, 1):
+    try:
+        emb = embeddings.embed_query(row["full_transcript"])
+        emb_str = "[" + ",".join(map(str, emb)) + "]"
 
-            db.execute_insert("""
-    UPDATE conversations
-    SET embedding = %s::vector
-    WHERE id = %s
-""", (emb_str, row["id"]))
+        with db.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE conversations
+                    SET embedding = %s::vector
+                    WHERE id = %s
+                """, (emb_str, row["id"]))
 
-            progress.progress(i / total)
+        progress.progress(i / total)
 
-        except Exception as e:
-            st.error(f"Failed to re-embed {row['id']}: {e}")
+    except Exception as e:
+        st.error(f"Failed to re-embed {row['id']}: {e}")
+
 
     st.success("✅ Memory re-embedding complete")
 
