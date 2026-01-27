@@ -95,6 +95,9 @@ def reembed_all_conversations():
 
     st.success("✅ Memory re-embedding complete")
 
+if st.sidebar.button("🧠 Rebuild Memory Index"):
+    reembed_all_conversations()
+
 
 # =============================================================================
 # SESSION STATE INITIALIZATION
