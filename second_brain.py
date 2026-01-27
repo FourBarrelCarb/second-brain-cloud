@@ -65,6 +65,7 @@ def reembed_all_conversations():
 
     st.success("✅ Memory re-embedding complete")
 
+
 st.sidebar.markdown("### Admin Tools")
 
 if st.sidebar.button("🧠 Rebuild Memory Index"):
