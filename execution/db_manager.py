@@ -57,13 +57,11 @@ class DatabaseManager:
             yield conn
             conn.commit()  # CRITICAL: Commit before returning to pool
             
-    except psycopg2.Error as e:
-        try:
-            if conn and not conn.closed:
+        except psycopg2.Error as e:
+            if conn:
                 conn.rollback()
-        except Exception:
-            pass
-        raise
+            logger.error(f"Database error: {e}")
+            raise
 
             
         finally:
