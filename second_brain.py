@@ -35,6 +35,53 @@ st.set_page_config(
 
 
 # =============================================================================
+# =============================================================================
+# ADMIN: ONE-TIME MEMORY RE-EMBED
+# =============================================================================
+
+def reembed_all_conversations():
+    """
+    One-time utility to rebuild missing embeddings.
+    Safe: does not affect chat, retrieval, or session state.
+    """
+    from execution.db_manager import get_db_manager
+    from execution.local_embeddings import get_embeddings
+
+    st.warning("⚠️ Rebuilding memory embeddings. This runs once and is safe.")
+
+    db = get_db_manager()
+    embeddings = get_embeddings()
+
+    rows = db.execute_query("""
+        SELECT id, full_transcript
+        FROM conversations
+        WHERE embedding IS NULL
+    """)
+
+    if not rows:
+        st.info("No conversations need re-embedding.")
+        return
+
+    progress = st.progress(0)
+    total = len(rows)
+
+    for i, row in enumerate(rows, 1):
+        try:
+            emb = embeddings.embed_query(row["full_transcript"])
+            emb_str = "[" + ",".join(map(str, emb)) + "]"
+
+            db.execute("""
+                UPDATE conversations
+                SET embedding = %s::vector
+                WHERE id = %s
+            """, (emb_str, row["id"]))
+
+            progress.progress(i / total)
+
+        except Exception as e:
+            st.error(f"Failed to re-embed {row['id']}: {e}")
+
+    st.success("✅ Memory re-embedding complete")
 
 # =============================================================================
 # SESSION STATE INITIALIZATION
@@ -170,6 +217,7 @@ def main():
     # =========================================================================
     # SIDEBAR
     # =========================================================================
+
     
     with st.sidebar:
         st.header("📊 Session Info")
@@ -183,6 +231,13 @@ def main():
         st.metric("Total Cost", f"${(st.session_state.total_cost + st.session_state.voice_cost):.4f}")
         
         st.divider()
+
+                st.divider()
+        st.subheader("🛠 Admin Tools")
+
+        if st.button("🧠 Rebuild Memory Index"):
+            reembed_all_conversations()
+
         
         # Voice Mode Toggle
         st.subheader("🎤 Voice Mode")
