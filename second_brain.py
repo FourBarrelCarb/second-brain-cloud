@@ -38,14 +38,12 @@ st.set_page_config(
 # =============================================================================
 # ADMIN: ONE-TIME MEMORY RE-EMBED
 # =============================================================================
-
 def reembed_all_conversations():
-    """
-    One-time utility to rebuild missing embeddings.
-    Safe: does not affect chat, retrieval, or session state.
-    """
+    st.error("🚨 DEBUG: reembed_all_conversations CALLED")
+
     from execution.db_manager import get_db_manager
     from execution.local_embeddings import get_embeddings
+    ...
 
     st.warning("⚠️ Rebuilding memory embeddings. This runs once and is safe.")
 
@@ -82,6 +80,11 @@ def reembed_all_conversations():
             st.error(f"Failed to re-embed {row['id']}: {e}")
 
     st.success("✅ Memory re-embedding complete")
+
+# ---- ADMIN BUTTON (TOP-LEVEL, SAFE) ----
+if st.sidebar.button("🧠 Rebuild Memory Index"):
+    reembed_all_conversations()
+
 
 # =============================================================================
 # SESSION STATE INITIALIZATION
@@ -231,13 +234,6 @@ def main():
         st.metric("Total Cost", f"${(st.session_state.total_cost + st.session_state.voice_cost):.4f}")
         
         st.divider()
-
-        st.divider()
-        st.subheader("🛠 Admin Tools")
-
-        if st.button("🧠 Rebuild Memory Index"):
-            reembed_all_conversations()
-
         
         # Voice Mode Toggle
         st.subheader("🎤 Voice Mode")
