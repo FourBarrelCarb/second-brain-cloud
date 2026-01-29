@@ -1,6 +1,7 @@
 """
-Second Brain "Athena" - Cloud-Native Application with Voice
-Complete AI assistant with perfect memory and voice capabilities
+Second Brain "Athena" - Phase 2A Enhanced
+Cloud-Native Application with OpenAI TTS Voice
+Complete AI assistant with perfect memory and natural voice capabilities
 """
 
 import streamlit as st
@@ -12,7 +13,7 @@ import logging
 from execution.retrieve_chats import hybrid_retrieve
 from execution.save_conversation import save_conversation
 from execution.call_claude import get_claude_client
-from execution.voice_handler import get_voice_handler, create_tts_audio
+from execution.voice_handler import get_voice_handler
 from execution.audio_recorder import audio_recorder_component
 
 # Setup logging
@@ -56,8 +57,17 @@ def init_session_state():
         st.session_state.total_cost = 0.0
     
     # Voice mode settings
-    if "voice_mode" not in st.session_state:
-        st.session_state.voice_mode = False
+    if "voice_input_enabled" not in st.session_state:
+        st.session_state.voice_input_enabled = False
+    
+    if "voice_output_enabled" not in st.session_state:
+        st.session_state.voice_output_enabled = False
+    
+    if "selected_voice" not in st.session_state:
+        st.session_state.selected_voice = "onyx"
+    
+    if "tts_model" not in st.session_state:
+        st.session_state.tts_model = "tts-1"
     
     if "voice_cost" not in st.session_state:
         st.session_state.voice_cost = 0.0
@@ -121,7 +131,7 @@ def process_voice_input() -> str:
     Handle voice input recording and transcription.
     Returns transcribed text or empty string.
     """
-    st.subheader("🎤 Voice Input")
+    st.markdown("### 🎤 Voice Input")
     
     # Audio recorder component
     audio_data = audio_recorder_component(key="voice_recorder")
@@ -138,8 +148,8 @@ def process_voice_input() -> str:
                 st.session_state.voice_cost += voice_cost
                 
                 if transcribed_text:
-                    st.success(f"✓ Transcribed: {transcribed_text}")
-                    st.caption(f"Voice cost: ${voice_cost:.4f}")
+                    st.success(f"✓ Transcribed: *{transcribed_text}*")
+                    st.caption(f"Whisper cost: ${voice_cost:.4f}")
                     return transcribed_text
                 else:
                     st.error("Failed to transcribe audio")
@@ -152,6 +162,45 @@ def process_voice_input() -> str:
     
     return ""
 
+
+def generate_voice_output(text: str):
+    """
+    Generate and play voice output using OpenAI TTS.
+    
+    Args:
+        text: Text to convert to speech
+    """
+    try:
+        voice_handler = get_voice_handler()
+        
+        with st.spinner("Generating voice response..."):
+            # Generate speech
+            audio_bytes = voice_handler.generate_speech(
+                text=text,
+                voice=st.session_state.selected_voice,
+                model=st.session_state.tts_model
+            )
+            
+            if audio_bytes:
+                # Calculate cost
+                tts_cost = voice_handler.estimate_tts_cost(
+                    text, 
+                    st.session_state.tts_model
+                )
+                st.session_state.voice_cost += tts_cost
+                
+                # Display audio player
+                st.audio(audio_bytes, format="audio/mp3")
+                st.caption(f"TTS cost: ${tts_cost:.4f}")
+                
+                logger.info(f"Voice output generated: {len(text)} chars")
+            else:
+                st.warning("Could not generate voice output")
+                
+    except Exception as e:
+        logger.error(f"Voice output error: {e}", exc_info=True)
+        st.warning(f"Voice output failed: {e}")
+
 # =============================================================================
 # MAIN APPLICATION
 # =============================================================================
@@ -163,7 +212,7 @@ def main():
     
     # Title
     st.title("🧠 Athena - Your Second Brain")
-    st.caption("Perfect memory • Voice enabled • Accessible from any device")
+    st.caption("Perfect memory • Natural voice • Accessible from any device")
     
     # =========================================================================
     # SIDEBAR
@@ -183,19 +232,76 @@ def main():
         
         st.divider()
         
-        # Voice Mode Toggle
-        st.subheader("🎤 Voice Mode")
-        voice_enabled = st.toggle(
-            "Enable Voice", 
-            value=st.session_state.voice_mode,
-            help="Turn on voice input and output"
-        )
-        st.session_state.voice_mode = voice_enabled
+        # Voice Settings
+        st.subheader("🎙️ Voice Settings")
         
-        if voice_enabled:
-            st.success("✓ Voice mode active")
-        else:
-            st.info("Voice mode off")
+        # Voice Input Toggle
+        voice_input = st.toggle(
+            "Enable Voice Input", 
+            value=st.session_state.voice_input_enabled,
+            help="Use microphone to speak your questions"
+        )
+        st.session_state.voice_input_enabled = voice_input
+        
+        # Voice Output Toggle
+        voice_output = st.toggle(
+            "Enable Voice Output",
+            value=st.session_state.voice_output_enabled,
+            help="Athena will speak responses using OpenAI TTS"
+        )
+        st.session_state.voice_output_enabled = voice_output
+        
+        # Voice Selection (only show if output enabled)
+        if voice_output:
+            st.markdown("**Voice Selection:**")
+            
+            voice_options = {
+                "Onyx (Deep male)": "onyx",
+                "Alloy (Neutral)": "alloy",
+                "Echo (Male)": "echo",
+                "Fable (British male)": "fable",
+                "Nova (Female)": "nova",
+                "Shimmer (Soft female)": "shimmer"
+            }
+            
+            selected_voice_label = st.selectbox(
+                "Choose voice",
+                options=list(voice_options.keys()),
+                index=0,
+                label_visibility="collapsed"
+            )
+            st.session_state.selected_voice = voice_options[selected_voice_label]
+            
+            # TTS Model Selection
+            tts_model = st.radio(
+                "Quality",
+                options=["tts-1 (Standard)", "tts-1-hd (High quality)"],
+                index=0 if st.session_state.tts_model == "tts-1" else 1,
+                help="HD quality costs 2x but sounds better"
+            )
+            st.session_state.tts_model = "tts-1-hd" if "hd" in tts_model.lower() else "tts-1"
+            
+            # Test Voice Button
+            if st.button("🔊 Test Voice", use_container_width=True):
+                test_text = "Hello! This is how I sound. I'm Athena, your AI assistant with perfect memory."
+                voice_handler = get_voice_handler()
+                
+                with st.spinner("Generating test..."):
+                    audio = voice_handler.generate_speech(
+                        test_text,
+                        st.session_state.selected_voice,
+                        st.session_state.tts_model
+                    )
+                    if audio:
+                        st.audio(audio, format="audio/mp3")
+        
+        # Status indicators
+        if voice_input:
+            st.success("✓ Voice input active")
+        if voice_output:
+            st.success("✓ Voice output active")
+        if not voice_input and not voice_output:
+            st.info("Voice features disabled")
         
         st.divider()
         
@@ -259,7 +365,7 @@ def main():
         # System info
         with st.expander("⚙️ System Info", expanded=False):
             st.caption("**Model:** Claude Sonnet 4")
-            st.caption("**Voice:** Whisper + Browser TTS")
+            st.caption("**Voice:** Whisper + OpenAI TTS")
             st.caption(f"**Retrieval:** Top {st.secrets.get('RETRIEVAL_TOP_K', 6)}")
             st.caption(f"**Context:** Last {st.secrets.get('SESSION_HISTORY_LIMIT', 10)} turns")
             st.caption(f"**Recency:** {st.secrets.get('RECENCY_BOOST_DAYS', 7)} days")
@@ -268,9 +374,10 @@ def main():
         
         # Tips
         st.caption("💡 **Tips:**")
-        st.caption("• Toggle voice mode above")
+        st.caption("• Toggle voice settings above")
         st.caption("• All conversations auto-saved")
         st.caption("• Works on all devices")
+        st.caption("• Voice output uses OpenAI TTS")
     
     # =========================================================================
     # CHAT INTERFACE
@@ -281,8 +388,11 @@ def main():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
     
+    # Input handling
+    prompt = None
+    
     # Voice Input Mode
-    if st.session_state.voice_mode:
+    if st.session_state.voice_input_enabled:
         prompt = process_voice_input()
     else:
         # Text Input Mode
@@ -369,11 +479,8 @@ Be helpful, concise, and build on our conversation history."""
                 status_placeholder.empty()
                 
                 # Step 5: Voice output if enabled
-                if st.session_state.voice_mode:
-                    st.components.v1.html(
-                        create_tts_audio(full_response),
-                        height=0
-                    )
+                if st.session_state.voice_output_enabled:
+                    generate_voice_output(full_response)
                 
                 # Step 6: Calculate tokens and cost
                 input_tokens = count_tokens_approx(prompt + retrieved_memories)
@@ -406,7 +513,7 @@ Be helpful, concise, and build on our conversation history."""
 
 if __name__ == "__main__":
     try:
-        logger.info("Starting Athena...")
+        logger.info("Starting Athena (Phase 2A Enhanced)...")
         main()
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
