@@ -22,7 +22,8 @@ class VoiceHandler:
     def __init__(self):
         """Initialize OpenAI client for Whisper and TTS."""
         try:
-            self.client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+            openai.api_key = st.secrets["OPENAI_API_KEY"]
+            self.client = openai
             logger.info("✓ Voice handler initialized (Whisper + OpenAI TTS)")
         except Exception as e:
             logger.error(f"Failed to initialize voice handler: {e}")
