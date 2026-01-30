@@ -46,10 +46,13 @@ class VoiceHandler:
             audio_file.name = f"audio.{audio_format}"
             
             # Call Whisper API
-            transcript = self.client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file
+            response = self.client.audio.speech.create(
+                model=model,
+                voice=voice,
+                input=text
             )
+            audio_bytes = response.content
+
             
             transcribed_text = transcript.text
             logger.info(f"✓ Transcribed {len(audio_bytes)} bytes: {transcribed_text[:50]}...")
