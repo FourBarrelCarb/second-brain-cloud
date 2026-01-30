@@ -1,5 +1,6 @@
 """
-Voice Handler - Whisper Transcription and Text-to-Speech
+Voice Handler - Phase 2A Enhanced
+Whisper Transcription + OpenAI TTS (instead of browser TTS)
 Handles voice input and output for Athena
 """
 
@@ -7,7 +8,6 @@ import streamlit as st
 import openai
 import logging
 from typing import Optional
-import base64
 import io
 
 logger = logging.getLogger(__name__)
@@ -15,14 +15,15 @@ logger = logging.getLogger(__name__)
 
 class VoiceHandler:
     """
-    Manages voice input (Whisper) and voice output (browser TTS).
+    Manages voice input (Whisper) and voice output (OpenAI TTS).
+    Phase 2A enhancement: Replaced browser TTS with OpenAI TTS for natural voice.
     """
     
     def __init__(self):
-        """Initialize OpenAI client for Whisper."""
+        """Initialize OpenAI client for Whisper and TTS."""
         try:
             self.client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-            logger.info("✓ Voice handler initialized")
+            logger.info("✓ Voice handler initialized (Whisper + OpenAI TTS)")
         except Exception as e:
             logger.error(f"Failed to initialize voice handler: {e}")
             raise
@@ -58,6 +59,47 @@ class VoiceHandler:
             logger.error(f"Transcription error: {e}", exc_info=True)
             return None
     
+    def generate_speech(
+        self, 
+        text: str, 
+        voice: str = "onyx",
+        model: str = "tts-1"
+    ) -> Optional[bytes]:
+        """
+        Generate speech from text using OpenAI TTS.
+        
+        Args:
+            text: Text to convert to speech
+            voice: Voice to use (alloy, echo, fable, onyx, nova, shimmer)
+            model: TTS model (tts-1 or tts-1-hd)
+            
+        Returns:
+            Audio bytes (MP3) or None on error
+        """
+        try:
+            # Limit text length (TTS has max limits)
+            if len(text) > 4096:
+                logger.warning(f"Text too long ({len(text)} chars), truncating to 4096")
+                text = text[:4096]
+            
+            # Call TTS API
+            response = self.client.audio.speech.create(
+                model=model,
+                voice=voice,
+                input=text
+            )
+            
+            # Get audio bytes
+            audio_bytes = response.content
+            
+            logger.info(f"✓ Generated speech: {len(text)} chars -> {len(audio_bytes)} bytes")
+            
+            return audio_bytes
+            
+        except Exception as e:
+            logger.error(f"TTS error: {e}", exc_info=True)
+            return None
+    
     def get_audio_duration_estimate(self, audio_bytes: bytes) -> float:
         """
         Estimate audio duration for cost calculation.
@@ -91,6 +133,29 @@ class VoiceHandler:
         cost = duration_minutes * 0.006
         
         return cost
+    
+    def estimate_tts_cost(self, text: str, model: str = "tts-1") -> float:
+        """
+        Estimate OpenAI TTS cost.
+        
+        Args:
+            text: Text to be converted to speech
+            model: TTS model (tts-1 or tts-1-hd)
+            
+        Returns:
+            Estimated cost in USD
+        """
+        char_count = len(text)
+        
+        # TTS pricing:
+        # tts-1: $15.00 per 1M characters
+        # tts-1-hd: $30.00 per 1M characters
+        if model == "tts-1-hd":
+            cost = (char_count / 1_000_000) * 30.00
+        else:
+            cost = (char_count / 1_000_000) * 15.00
+        
+        return cost
 
 
 # Cached instance
@@ -101,47 +166,3 @@ def get_voice_handler():
     Cached by Streamlit for performance.
     """
     return VoiceHandler()
-
-
-def create_tts_audio(text: str) -> str:
-    """
-    Create text-to-speech audio using browser's built-in capabilities.
-    Returns JavaScript code to execute speech synthesis.
-    
-    Args:
-        text: Text to speak
-        
-    Returns:
-        JavaScript code for speech synthesis
-    """
-    # Escape quotes and newlines in text
-    safe_text = text.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'").replace('\n', ' ')
-    
-    # Limit text length for TTS (browsers have limits)
-    if len(safe_text) > 1000:
-        safe_text = safe_text[:1000] + "..."
-    
-    js_code = f"""
-    <script>
-    (function() {{
-        // Cancel any ongoing speech
-        window.speechSynthesis.cancel();
-        
-        // Create utterance
-        const utterance = new SpeechSynthesisUtterance("{safe_text}");
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-        
-        // Wait a moment then speak (helps with Safari)
-        setTimeout(function() {{
-            window.speechSynthesis.speak(utterance);
-        }}, 100);
-        
-        // Log for debugging
-        console.log("Athena speaking:", "{safe_text}".substring(0, 50) + "...");
-    }})();
-    </script>
-    """
-    
-    return js_code
