@@ -18,7 +18,7 @@ class VoiceHandler:
     Manages voice input (Whisper) and voice output (OpenAI TTS).
     Phase 2A enhancement: Replaced browser TTS with OpenAI TTS for natural voice.
     """
-    
+
     def __init__(self):
         """Initialize OpenAI client for Whisper and TTS."""
         try:
@@ -28,143 +28,113 @@ class VoiceHandler:
         except Exception as e:
             logger.error(f"Failed to initialize voice handler: {e}")
             raise
-    
-    def transcribe_audio(self, audio_bytes: bytes, audio_format: str = "wav") -> Optional[str]:
+
+    def transcribe_audio(
+        self,
+        audio_bytes: bytes,
+        audio_format: str = "wav"
+    ) -> Optional[str]:
         """
         Transcribe audio using Whisper API.
-        
+
         Args:
             audio_bytes: Raw audio data
             audio_format: Audio format (wav, webm, mp3, etc.)
-            
+
         Returns:
             Transcribed text or None on error
         """
         try:
-            # Create a file-like object from bytes
             audio_file = io.BytesIO(audio_bytes)
             audio_file.name = f"audio.{audio_format}"
-            
-            # Call Whisper API
-            response = self.client.audio.speech.create(
-                model=model,
-                voice=voice,
-                input=text
-            )
-            audio_bytes = response.content
 
-            
+            transcript = self.client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file
+            )
+
             transcribed_text = transcript.text
-            logger.info(f"✓ Transcribed {len(audio_bytes)} bytes: {transcribed_text[:50]}...")
-            
+            logger.info(f"✓ Transcribed audio ({len(audio_bytes)} bytes)")
+
             return transcribed_text
-            
+
         except Exception as e:
             logger.error(f"Transcription error: {e}", exc_info=True)
             return None
-    
+
     def generate_speech(
-        self, 
-        text: str, 
+        self,
+        text: str,
         voice: str = "onyx",
         model: str = "tts-1"
     ) -> Optional[bytes]:
         """
         Generate speech from text using OpenAI TTS.
-        
+
         Args:
             text: Text to convert to speech
             voice: Voice to use (alloy, echo, fable, onyx, nova, shimmer)
             model: TTS model (tts-1 or tts-1-hd)
-            
+
         Returns:
             Audio bytes (MP3) or None on error
         """
         try:
-            # Limit text length (TTS has max limits)
             if len(text) > 4096:
-                logger.warning(f"Text too long ({len(text)} chars), truncating to 4096")
+                logger.warning(
+                    f"Text too long ({len(text)} chars), truncating to 4096"
+                )
                 text = text[:4096]
-            
-            # Call TTS API
+
             response = self.client.audio.speech.create(
                 model=model,
                 voice=voice,
                 input=text
             )
-            
-            # Get audio bytes
-            audio_bytes = response.content
-            
-            logger.info(f"✓ Generated speech: {len(text)} chars -> {len(audio_bytes)} bytes")
-            
+
+            audio_bytes = response.read()
+
+            logger.info(
+                f"✓ Generated speech ({len(text)} chars → {len(audio_bytes)} bytes)"
+            )
+
             return audio_bytes
-            
+
         except Exception as e:
             logger.error(f"TTS error: {e}", exc_info=True)
             return None
-    
+
     def get_audio_duration_estimate(self, audio_bytes: bytes) -> float:
         """
         Estimate audio duration for cost calculation.
-        Very rough estimate: ~16KB per second for webm.
-        
-        Args:
-            audio_bytes: Raw audio data
-            
-        Returns:
-            Estimated duration in seconds
+        Rough estimate: ~16KB per second for webm-like audio.
         """
-        # Rough estimate: webm is ~16KB/second
         kb_size = len(audio_bytes) / 1024
         estimated_seconds = kb_size / 16
         return estimated_seconds
-    
+
     def estimate_transcription_cost(self, audio_bytes: bytes) -> float:
         """
         Estimate Whisper API cost.
-        
-        Args:
-            audio_bytes: Raw audio data
-            
-        Returns:
-            Estimated cost in USD
         """
         duration_seconds = self.get_audio_duration_estimate(audio_bytes)
         duration_minutes = duration_seconds / 60
-        
-        # Whisper pricing: $0.006 per minute
-        cost = duration_minutes * 0.006
-        
-        return cost
-    
+        return duration_minutes * 0.006
+
     def estimate_tts_cost(self, text: str, model: str = "tts-1") -> float:
         """
         Estimate OpenAI TTS cost.
-        
-        Args:
-            text: Text to be converted to speech
-            model: TTS model (tts-1 or tts-1-hd)
-            
-        Returns:
-            Estimated cost in USD
         """
         char_count = len(text)
-        
-        # TTS pricing:
-        # tts-1: $15.00 per 1M characters
-        # tts-1-hd: $30.00 per 1M characters
+
         if model == "tts-1-hd":
-            cost = (char_count / 1_000_000) * 30.00
+            return (char_count / 1_000_000) * 30.00
         else:
-            cost = (char_count / 1_000_000) * 15.00
-        
-        return cost
+            return (char_count / 1_000_000) * 15.00
 
 
-# Cached instance
 @st.cache_resource
-def get_voice_handler():
+def get_voice_handler() -> VoiceHandler:
     """
     Get or create the global voice handler instance.
     Cached by Streamlit for performance.
