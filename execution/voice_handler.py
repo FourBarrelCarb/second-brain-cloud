@@ -89,7 +89,8 @@ class VoiceHandler:
             response = self.client.audio.speech.create(
                 model=model,
                 voice=voice,
-                input=text
+                input=text,
+                format="mp3"
             )
 
             audio_bytes = response.read()
