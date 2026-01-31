@@ -6,6 +6,7 @@ Complete AI assistant with perfect memory and natural voice capabilities
 
 import tempfile
 import os
+import base64
 import streamlit as st
 from datetime import datetime
 from uuid import uuid4
