@@ -29,6 +29,9 @@ class VoiceHandler:
             logger.error(f"Failed to initialize voice handler: {e}")
             raise
 
+    # -------------------------
+    # Voice Input (Whisper)
+    # -------------------------
     def transcribe_audio(
         self,
         audio_bytes: bytes,
@@ -36,13 +39,6 @@ class VoiceHandler:
     ) -> Optional[str]:
         """
         Transcribe audio using Whisper API.
-
-        Args:
-            audio_bytes: Raw audio data
-            audio_format: Audio format (wav, webm, mp3, etc.)
-
-        Returns:
-            Transcribed text or None on error
         """
         try:
             audio_file = io.BytesIO(audio_bytes)
@@ -53,15 +49,16 @@ class VoiceHandler:
                 file=audio_file
             )
 
-            transcribed_text = transcript.text
-            logger.info(f"✓ Transcribed audio ({len(audio_bytes)} bytes)")
-
-            return transcribed_text
+            logger.info("✓ Whisper transcription successful")
+            return transcript.text
 
         except Exception as e:
             logger.error(f"Transcription error: {e}", exc_info=True)
             return None
 
+    # -------------------------
+    # Voice Output (TTS)
+    # -------------------------
     def generate_speech(
         self,
         text: str,
@@ -70,16 +67,12 @@ class VoiceHandler:
     ) -> Optional[bytes]:
         """
         Generate speech from text using OpenAI TTS.
-
-        Args:
-            text: Text to convert to speech
-            voice: Voice to use (alloy, echo, fable, onyx, nova, shimmer)
-            model: TTS model (tts-1 or tts-1-hd)
-
-        Returns:
-            Audio bytes (MP3) or None on error
+        Returns MP3 bytes (browser-safe).
         """
         try:
+            if not text:
+                return None
+
             if len(text) > 4096:
                 logger.warning(
                     f"Text too long ({len(text)} chars), truncating to 4096"
@@ -90,13 +83,16 @@ class VoiceHandler:
                 model=model,
                 voice=voice,
                 input=text,
-                format="mp3"
+                format="mp3"  # 🔑 critical for macOS playback
             )
 
             audio_bytes = response.read()
 
+            if not audio_bytes:
+                raise ValueError("Empty audio returned from TTS")
+
             logger.info(
-                f"✓ Generated speech ({len(text)} chars → {len(audio_bytes)} bytes)"
+                f"✓ TTS generated ({len(text)} chars → {len(audio_bytes)} bytes)"
             )
 
             return audio_bytes
@@ -105,39 +101,41 @@ class VoiceHandler:
             logger.error(f"TTS error: {e}", exc_info=True)
             return None
 
+    # -------------------------
+    # Cost Estimation Helpers
+    # -------------------------
     def get_audio_duration_estimate(self, audio_bytes: bytes) -> float:
         """
-        Estimate audio duration for cost calculation.
-        Rough estimate: ~16KB per second for webm-like audio.
+        Rough duration estimate: ~16KB per second
         """
         kb_size = len(audio_bytes) / 1024
-        estimated_seconds = kb_size / 16
-        return estimated_seconds
+        return kb_size / 16
 
     def estimate_transcription_cost(self, audio_bytes: bytes) -> float:
         """
-        Estimate Whisper API cost.
+        Whisper cost estimate: $0.006 per minute
         """
-        duration_seconds = self.get_audio_duration_estimate(audio_bytes)
-        duration_minutes = duration_seconds / 60
-        return duration_minutes * 0.006
+        seconds = self.get_audio_duration_estimate(audio_bytes)
+        return (seconds / 60) * 0.006
 
     def estimate_tts_cost(self, text: str, model: str = "tts-1") -> float:
         """
-        Estimate OpenAI TTS cost.
+        TTS cost estimate based on character count
         """
-        char_count = len(text)
+        chars = len(text)
 
         if model == "tts-1-hd":
-            return (char_count / 1_000_000) * 30.00
+            return (chars / 1_000_000) * 30.0
         else:
-            return (char_count / 1_000_000) * 15.00
+            return (chars / 1_000_000) * 15.0
 
 
+# -------------------------
+# Cached Singleton
+# -------------------------
 @st.cache_resource
 def get_voice_handler() -> VoiceHandler:
     """
-    Get or create the global voice handler instance.
-    Cached by Streamlit for performance.
+    Global cached VoiceHandler instance.
     """
     return VoiceHandler()
