@@ -57,10 +57,10 @@ def init_session_state():
         st.session_state.total_cost = 0.0
 
     if "tts_audio" not in st.session_state:
-    st.session_state.tts_audio = None
+        st.session_state.tts_audio = None
 
     if "tts_text_hash" not in st.session_state:
-    st.session_state.tts_text_hash = None
+        st.session_state.tts_text_hash = None
 
     
     # Voice mode settings
