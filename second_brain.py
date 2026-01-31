@@ -55,6 +55,13 @@ def init_session_state():
     
     if "total_cost" not in st.session_state:
         st.session_state.total_cost = 0.0
+
+    if "tts_audio" not in st.session_state:
+    st.session_state.tts_audio = None
+
+    if "tts_text_hash" not in st.session_state:
+    st.session_state.tts_text_hash = None
+
     
     # Voice mode settings
     if "voice_input_enabled" not in st.session_state:
@@ -165,41 +172,45 @@ def process_voice_input() -> str:
 
 def generate_voice_output(text: str):
     """
-    Generate and play voice output using OpenAI TTS.
-    
-    Args:
-        text: Text to convert to speech
+    Generate voice output using OpenAI TTS
+    and store it safely for cross-device playback.
     """
     try:
         voice_handler = get_voice_handler()
-        
+        text_hash = hash(text)
+
+        # Avoid regenerating the same audio on reruns
+        if st.session_state.tts_text_hash == text_hash:
+            return
+
         with st.spinner("Generating voice response..."):
-            # Generate speech
             audio_bytes = voice_handler.generate_speech(
                 text=text,
                 voice=st.session_state.selected_voice,
                 model=st.session_state.tts_model
             )
-            
-            if audio_bytes:
-                # Calculate cost
-                tts_cost = voice_handler.estimate_tts_cost(
-                    text, 
-                    st.session_state.tts_model
-                )
-                st.session_state.voice_cost += tts_cost
-                
-                # Display audio player
-                st.audio(audio_bytes, format="audio/mp3")
-                st.caption(f"TTS cost: ${tts_cost:.4f}")
-                
-                logger.info(f"Voice output generated: {len(text)} chars")
-            else:
+
+            if not audio_bytes:
                 st.warning("Could not generate voice output")
-                
+                return
+
+            # Store audio safely in session state
+            st.session_state.tts_audio = audio_bytes
+            st.session_state.tts_text_hash = text_hash
+
+            # Cost tracking
+            tts_cost = voice_handler.estimate_tts_cost(
+                text,
+                st.session_state.tts_model
+            )
+            st.session_state.voice_cost += tts_cost
+
+            st.caption(f"TTS cost: ${tts_cost:.4f}")
+            logger.info("✓ Voice output generated and stored")
+
     except Exception as e:
         logger.error(f"Voice output error: {e}", exc_info=True)
-        st.warning(f"Voice output failed: {e}")
+        st.warning("Voice output failed")
 
 # =============================================================================
 # MAIN APPLICATION
