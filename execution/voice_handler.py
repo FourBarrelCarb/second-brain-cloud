@@ -90,7 +90,7 @@ class VoiceHandler:
                 model=model,
                 voice=voice,
                 input=text,
-                format="mp3"
+                format="wav"
             )
 
             audio_bytes = response.read()
