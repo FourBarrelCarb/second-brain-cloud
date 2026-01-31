@@ -307,7 +307,7 @@ def main():
                         st.session_state.tts_model
                     )
                     if audio:
-                        st.audio(audio, format="audio/mp3")
+                        st.audio(audio, format="audio/wav")
         
         # Status indicators
         if voice_input:
@@ -506,7 +506,7 @@ Be helpful, concise, and build on our conversation history."""
 
                         audio_html = f"""
                         <audio controls>
-                            <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
+                            <source src="data:audio/wav;base64,{b64_audio}" type="audio/wav">
                         Your browser does not support the audio element.
                         </audio>
                         """
