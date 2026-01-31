@@ -190,7 +190,7 @@ def generate_voice_output(text: str):
                 st.session_state.voice_cost += tts_cost
                 
                 # Display audio player
-                st.audio(audio_bytes, format="audio/mp3")
+                st.audio(audio_bytes, format="audio/wav")
                 st.caption(f"TTS cost: ${tts_cost:.4f}")
                 
                 logger.info(f"Voice output generated: {len(text)} chars")
@@ -293,7 +293,7 @@ def main():
                         st.session_state.tts_model
                     )
                     if audio:
-                        st.audio(audio, format="audio/mp3")
+                        st.audio(audio, format="audio/wav")
         
         # Status indicators
         if voice_input:
