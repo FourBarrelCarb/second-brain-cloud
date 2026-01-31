@@ -490,8 +490,13 @@ Be helpful, concise, and build on our conversation history."""
                 status_placeholder.empty()
                 
                 # Step 5: Voice output if enabled
-                if st.session_state.voice_output_enabled:
-                    generate_voice_output(full_response)
+                # Render audio player (required for macOS + mobile)
+                if (
+                    st.session_state.voice_output_enabled
+                    and st.session_state.tts_audio
+                    ):
+                    st.audio(st.session_state.tts_audio, format="audio/mp3")
+
                 
                 # Step 6: Calculate tokens and cost
                 input_tokens = count_tokens_approx(prompt + retrieved_memories)
