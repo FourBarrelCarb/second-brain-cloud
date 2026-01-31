@@ -4,6 +4,8 @@ Cloud-Native Application with OpenAI TTS Voice
 Complete AI assistant with perfect memory and natural voice capabilities
 """
 
+import tempfile
+import os
 import streamlit as st
 from datetime import datetime
 from uuid import uuid4
@@ -495,9 +497,7 @@ Be helpful, concise, and build on our conversation history."""
                     st.session_state.voice_output_enabled
                     and st.session_state.tts_audio
                     ):
-
-                    if st.button("▶️ Play Voice Response", key=f"play_{st.session_state.turn_number}"):
-                        st.audio(st.session_state.tts_audio, format="audio/mp3")
+                    st.audio(st.session_state.tts_audio, format="audio/mp3")
 
                 
                 # Step 6: Calculate tokens and cost
