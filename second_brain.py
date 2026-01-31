@@ -498,7 +498,21 @@ Be helpful, concise, and build on our conversation history."""
                     st.session_state.voice_output_enabled
                     and st.session_state.tts_audio
                     ):
-                    st.audio(st.session_state.tts_audio, format="audio/mp3")
+                    if st.button("▶️ Play Voice Response", key=f"play_{st.session_state.turn_number}"):
+
+                        b64_audio = base64.b64encode(
+                            st.session_state.tts_audio
+                        ).decode("utf-8")
+
+                        audio_html = f"""
+                        <audio controls>
+                            <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
+                        Your browser does not support the audio element.
+                        </audio>
+                        """
+
+        st.markdown(audio_html, unsafe_allow_html=True)
+
 
                 
                 # Step 6: Calculate tokens and cost
