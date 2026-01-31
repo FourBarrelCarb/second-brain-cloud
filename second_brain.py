@@ -4,9 +4,6 @@ Cloud-Native Application with OpenAI TTS Voice
 Complete AI assistant with perfect memory and natural voice capabilities
 """
 
-import tempfile
-import os
-import base64
 import streamlit as st
 from datetime import datetime
 from uuid import uuid4
@@ -58,13 +55,6 @@ def init_session_state():
     
     if "total_cost" not in st.session_state:
         st.session_state.total_cost = 0.0
-
-    if "tts_audio" not in st.session_state:
-        st.session_state.tts_audio = None
-
-    if "tts_text_hash" not in st.session_state:
-        st.session_state.tts_text_hash = None
-
     
     # Voice mode settings
     if "voice_input_enabled" not in st.session_state:
@@ -175,45 +165,41 @@ def process_voice_input() -> str:
 
 def generate_voice_output(text: str):
     """
-    Generate voice output using OpenAI TTS
-    and store it safely for cross-device playback.
+    Generate and play voice output using OpenAI TTS.
+    
+    Args:
+        text: Text to convert to speech
     """
     try:
         voice_handler = get_voice_handler()
-        text_hash = hash(text)
-
-        # Avoid regenerating the same audio on reruns
-        if st.session_state.tts_text_hash == text_hash:
-            return
-
+        
         with st.spinner("Generating voice response..."):
+            # Generate speech
             audio_bytes = voice_handler.generate_speech(
                 text=text,
                 voice=st.session_state.selected_voice,
                 model=st.session_state.tts_model
             )
-
-            if not audio_bytes:
+            
+            if audio_bytes:
+                # Calculate cost
+                tts_cost = voice_handler.estimate_tts_cost(
+                    text, 
+                    st.session_state.tts_model
+                )
+                st.session_state.voice_cost += tts_cost
+                
+                # Display audio player
+                st.audio(audio_bytes, format="audio/mp3")
+                st.caption(f"TTS cost: ${tts_cost:.4f}")
+                
+                logger.info(f"Voice output generated: {len(text)} chars")
+            else:
                 st.warning("Could not generate voice output")
-                return
-
-            # Store audio safely in session state
-            st.session_state.tts_audio = audio_bytes
-            st.session_state.tts_text_hash = text_hash
-
-            # Cost tracking
-            tts_cost = voice_handler.estimate_tts_cost(
-                text,
-                st.session_state.tts_model
-            )
-            st.session_state.voice_cost += tts_cost
-
-            st.caption(f"TTS cost: ${tts_cost:.4f}")
-            logger.info("✓ Voice output generated and stored")
-
+                
     except Exception as e:
         logger.error(f"Voice output error: {e}", exc_info=True)
-        st.warning("Voice output failed")
+        st.warning(f"Voice output failed: {e}")
 
 # =============================================================================
 # MAIN APPLICATION
@@ -307,7 +293,7 @@ def main():
                         st.session_state.tts_model
                     )
                     if audio:
-                        st.audio(audio, format="audio/wav")
+                        st.audio(audio, format="audio/mp3")
         
         # Status indicators
         if voice_input:
@@ -493,27 +479,8 @@ Be helpful, concise, and build on our conversation history."""
                 status_placeholder.empty()
                 
                 # Step 5: Voice output if enabled
-                # Render audio player (required for macOS + mobile)
-                if (
-                    st.session_state.voice_output_enabled
-                    and st.session_state.tts_audio
-                    ):
-                    if st.button("▶️ Play Voice Response", key=f"play_{st.session_state.turn_number}"):
-
-                        b64_audio = base64.b64encode(
-                            st.session_state.tts_audio
-                        ).decode("utf-8")
-
-                        audio_html = f"""
-                        <audio controls>
-                            <source src="data:audio/wav;base64,{b64_audio}" type="audio/wav">
-                        Your browser does not support the audio element.
-                        </audio>
-                        """
-
-                        st.markdown(audio_html, unsafe_allow_html=True)
-
-
+                if st.session_state.voice_output_enabled:
+                    generate_voice_output(full_response)
                 
                 # Step 6: Calculate tokens and cost
                 input_tokens = count_tokens_approx(prompt + retrieved_memories)
