@@ -13,7 +13,7 @@ import logging
 from execution.retrieve_chats import hybrid_retrieve
 from execution.save_conversation import save_conversation
 from execution.call_claude import get_claude_client
-from execution.voice_handler import get_voice_handler, create_tts_audio
+from execution.voice_handler import get_voice_handler
 from execution.audio_recorder import audio_recorder_component
 from execution.grok_handler import get_grok_client, hybrid_query
 from execution.insights_engine import get_insights_engine
@@ -488,10 +488,15 @@ Be helpful, concise, and build on our conversation history."""
                 
                 # Step 6: Voice output if enabled
                 if st.session_state.voice_mode:
-                    st.components.v1.html(
-                        create_tts_audio(full_response),
-                        height=0
-                    )
+                    try:
+                        voice_handler = get_voice_handler()
+                        audio_bytes = voice_handler.generate_speech(full_response)
+
+                        if audio_bytes:
+                            st.audio(audio_bytes, format="audio/wav")
+                    except Exception as e:
+                        logger.warning(f"Voice output failed: {e}")
+
                 
                 # Step 7: Calculate tokens and cost
                 input_tokens = count_tokens_approx(prompt + retrieved_memories)
