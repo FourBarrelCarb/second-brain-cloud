@@ -5,8 +5,8 @@ Handles voice input and output for Athena
 """
 
 import streamlit as st
+import openai
 import logging
-from openai import OpenAI
 from typing import Optional
 import io
 
@@ -20,13 +20,14 @@ class VoiceHandler:
     """
 
     def __init__(self):
-    api_key = st.secrets.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY not set in Streamlit secrets")
-
-    self.client = OpenAI(api_key=api_key)
-    logger.info("✓ Voice handler initialized (Whisper + OpenAI TTS)")
-
+        """Initialize OpenAI client for Whisper and TTS."""
+        try:
+            openai.api_key = st.secrets["OPENAI_API_KEY"]
+            self.client = openai
+            logger.info("✓ Voice handler initialized (Whisper + OpenAI TTS)")
+        except Exception as e:
+            logger.error(f"Failed to initialize voice handler: {e}")
+            raise
 
     def transcribe_audio(
         self,
@@ -88,11 +89,11 @@ class VoiceHandler:
             response = self.client.audio.speech.create(
                 model=model,
                 voice=voice,
-                input=text
+                input=text,
+                format="wav"
             )
 
             audio_bytes = response.read()
-
 
             logger.info(
                 f"✓ Generated speech ({len(text)} chars → {len(audio_bytes)} bytes)"
