@@ -66,44 +66,30 @@ class VoiceHandler:
         self,
         text: str,
         voice: str = "onyx",
-        model: str = "tts-1"
+        model: str = "gpt-4o-mini-tts"
     ) -> Optional[bytes]:
-        """
-        Generate speech from text using OpenAI TTS.
+    """
+    Generate speech using the NEW OpenAI SDK (2024+).
+    """
 
-        Args:
-            text: Text to convert to speech
-            voice: Voice to use (alloy, echo, fable, onyx, nova, shimmer)
-            model: TTS model (tts-1 or tts-1-hd)
+    try:
+        if len(text) > 4096:
+            text = text[:4096]
 
-        Returns:
-            Audio bytes (MP3) or None on error
-        """
-        try:
-            if len(text) > 4096:
-                logger.warning(
-                    f"Text too long ({len(text)} chars), truncating to 4096"
-                )
-                text = text[:4096]
-
-            response = self.client.audio.speech.create(
-                model=model,
-                voice=voice,
-                input=text,
-                format="wav"
-            )
-
+        with self.client.audio.speech.with_streaming_response.create(
+            model=model,
+            voice=voice,
+            input=text
+        ) as response:
             audio_bytes = response.read()
 
-            logger.info(
-                f"✓ Generated speech ({len(text)} chars → {len(audio_bytes)} bytes)"
-            )
+        logger.info(f"✓ Generated speech ({len(audio_bytes)} bytes)")
+        return audio_bytes
 
-            return audio_bytes
+    except Exception as e:
+        logger.error(f"TTS error: {e}", exc_info=True)
+        return None
 
-        except Exception as e:
-            logger.error(f"TTS error: {e}", exc_info=True)
-            return None
 
     def get_audio_duration_estimate(self, audio_bytes: bytes) -> float:
         """
