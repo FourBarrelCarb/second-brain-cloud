@@ -271,7 +271,7 @@ def main():
     display_weekly_digest()
 
     if st.session_state.voice_mode:
-    generate_voice_output(full_response)
+        generate_voice_output(full_response)
 
     
     # =========================================================================
