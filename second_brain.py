@@ -73,9 +73,16 @@ def init_session_state():
     if "digest_viewed" not in st.session_state:
         st.session_state.digest_viewed = False
 
+    # ---- VOICE OUTPUT ----
+    if st.session_state.voice_mode:
+        st.warning("VOICE OUTPUT PATH HIT")
+        st.components.v1.html(create_tts_audio(response), height=0)
+
+
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
 
 def format_retrieved_memories(documents) -> str:
     """Format retrieved documents for Claude's context."""
