@@ -141,3 +141,34 @@ def get_voice_handler() -> VoiceHandler:
     Cached by Streamlit for performance.
     """
     return VoiceHandler()
+
+def create_tts_audio(text: str) -> str:
+    """
+    Browser-safe fallback TTS using SpeechSynthesis.
+    Used by Phase 2B UI to avoid audio file handling issues.
+    """
+
+    if not text:
+        return ""
+
+    # Escape text for JS safety
+    escaped = (
+        text.replace("\\", "\\\\")
+            .replace("'", "\\'")
+            .replace("\n", " ")
+    )
+
+    return f"""
+    <script>
+        try {{
+            const msg = new SpeechSynthesisUtterance('{escaped}');
+            msg.rate = 1;
+            msg.pitch = 1;
+            msg.lang = 'en-US';
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(msg);
+        }} catch (e) {{
+            console.error('TTS failed', e);
+        }}
+    </script>
+    """
