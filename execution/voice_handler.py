@@ -128,16 +128,15 @@ def get_voice_handler() -> VoiceHandler:
     """
     return VoiceHandler()
 
-def create_tts_audio(text: str) -> str:
-    """
-    Browser-safe fallback TTS using SpeechSynthesis.
-    Used by Phase 2B UI to avoid audio file handling issues.
-    """
+@st.cache_resource
+def get_voice_handler() -> VoiceHandler:
+    return VoiceHandler()
 
+
+def create_tts_audio(text: str) -> str:
     if not text:
         return ""
 
-    # Escape text for JS safety
     escaped = (
         text.replace("\\", "\\\\")
             .replace("'", "\\'")
@@ -146,15 +145,11 @@ def create_tts_audio(text: str) -> str:
 
     return f"""
     <script>
-        try {{
-            const msg = new SpeechSynthesisUtterance('{escaped}');
-            msg.rate = 1;
-            msg.pitch = 1;
-            msg.lang = 'en-US';
-            window.speechSynthesis.cancel();
-            window.speechSynthesis.speak(msg);
-        }} catch (e) {{
-            console.error('TTS failed', e);
-        }}
+        const msg = new SpeechSynthesisUtterance('{escaped}');
+        msg.rate = 1;
+        msg.pitch = 1;
+        msg.lang = 'en-US';
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(msg);
     </script>
     """
