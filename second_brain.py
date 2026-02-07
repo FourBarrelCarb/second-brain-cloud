@@ -73,20 +73,20 @@ def init_session_state():
     if "digest_viewed" not in st.session_state:
         st.session_state.digest_viewed = False
 
-if "voice_input_enabled" not in st.session_state:
-    st.session_state.voice_input_enabled = False
+    if "voice_input_enabled" not in st.session_state:
+        st.session_state.voice_input_enabled = False
 
-if "voice_output_enabled" not in st.session_state:
-    st.session_state.voice_output_enabled = False
+    if "voice_output_enabled" not in st.session_state:
+        st.session_state.voice_output_enabled = False
 
-if "selected_voice" not in st.session_state:
-    st.session_state.selected_voice = "onyx"
+    if "selected_voice" not in st.session_state:
+        st.session_state.selected_voice = "onyx"
 
-if "tts_model" not in st.session_state:
-    st.session_state.tts_model = "tts-1"
+    if "tts_model" not in st.session_state:
+        st.session_state.tts_model = "tts-1"
 
-if "voice_cost" not in st.session_state:
-    st.session_state.voice_cost = 0.0
+    if "voice_cost" not in st.session_state:
+        st.session_state.voice_cost = 0.0
 
 
 # =============================================================================
