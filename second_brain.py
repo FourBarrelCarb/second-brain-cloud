@@ -15,7 +15,7 @@ from execution.save_conversation import save_conversation
 from execution.call_claude import get_claude_client
 from execution.voice_handler import get_voice_handler, create_tts_audio
 from execution.audio_recorder import audio_recorder_component
-from execution.grok_handler import get_grok_client, hybrid_query
+from execution.grok_handler import hybrid_query
 from execution.insights_engine import get_insights_engine
 
 # Setup logging
