@@ -287,7 +287,7 @@ def main():
         # Display alerts
         display_alerts()
         
-
+        st.divider()
         
         # Actions
         col1, col2 = st.columns(2)
