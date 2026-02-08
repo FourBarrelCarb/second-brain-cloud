@@ -1,27 +1,20 @@
-import os
 import requests
 import logging
+import streamlit as st
 
 logger = logging.getLogger("grok")
 
-XAI_API_KEY = os.getenv("XAI_API_KEY")
+XAI_API_KEY = st.secrets.get("XAI_API_KEY")
 
 GROK_API_URL = "https://api.x.ai/v1/chat/completions"
 GROK_MODEL = "grok-beta"
-
-# Rough pricing placeholder (adjust if you have exact rates)
 COST_PER_1K_TOKENS = 0.01
 
 
 def hybrid_query(prompt: str) -> dict:
-    """
-    Decide whether to use Grok and fetch real-time data if needed.
-    """
-
-    # --- ROUTING LOGIC ---
     realtime_keywords = [
-        "latest", "today", "current", "news", "price",
-        "market", "now", "this week", "breaking"
+        "latest", "today", "current", "news",
+        "price", "market", "now", "breaking"
     ]
 
     use_grok = any(k in prompt.lower() for k in realtime_keywords)
@@ -34,9 +27,9 @@ def hybrid_query(prompt: str) -> dict:
         }
 
     if not XAI_API_KEY:
-        raise RuntimeError("XAI_API_KEY is missing")
+        raise RuntimeError("XAI_API_KEY missing in Streamlit secrets")
 
-    logger.info("Grok triggered – calling xAI API")
+    logger.info("✅ Grok triggered")
 
     headers = {
         "Authorization": f"Bearer {XAI_API_KEY}",
@@ -46,55 +39,34 @@ def hybrid_query(prompt: str) -> dict:
     payload = {
         "model": GROK_MODEL,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are a real-time news assistant. Answer concisely."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
+            {"role": "system", "content": "You provide real-time information."},
+            {"role": "user", "content": prompt}
         ],
         "temperature": 0.2
     }
 
-    try:
-        resp = requests.post(
-            GROK_API_URL,
-            headers=headers,
-            json=payload,
-            timeout=30
+    resp = requests.post(
+        GROK_API_URL,
+        headers=headers,
+        json=payload,
+        timeout=30
+    )
+
+    if resp.status_code != 200:
+        raise RuntimeError(
+            f"Grok API error {resp.status_code}: {resp.text}"
         )
 
-        if resp.status_code != 200:
-            raise RuntimeError(
-                f"Grok API error {resp.status_code}: {resp.text}"
-            )
+    data = resp.json()
 
-        data = resp.json()
+    content = data["choices"][0]["message"]["content"]
+    tokens = data.get("usage", {}).get("total_tokens", 0)
+    cost = (tokens / 1000) * COST_PER_1K_TOKENS
 
-        content = (
-            data["choices"][0]["message"]["content"]
-            if data.get("choices")
-            else ""
-        )
+    logger.info(f"✅ Grok success | tokens={tokens} | cost=${cost:.4f}")
 
-        if not content.strip():
-            logger.warning("Grok returned empty content")
-
-        # --- COST ESTIMATION ---
-        usage = data.get("usage", {})
-        tokens = usage.get("total_tokens", 0)
-        cost = (tokens / 1000) * COST_PER_1K_TOKENS
-
-        logger.info(f"Grok success – tokens={tokens}, cost=${cost:.4f}")
-
-        return {
-            "use_grok": True,
-            "grok_data": content,
-            "cost": cost
-        }
-
-    except Exception as e:
-        logger.error("Grok call failed", exc_info=True)
-        raise
+    return {
+        "use_grok": True,
+        "grok_data": content,
+        "cost": cost
+    }
