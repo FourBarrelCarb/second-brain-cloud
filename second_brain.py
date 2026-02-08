@@ -73,6 +73,18 @@ def init_session_state():
     if "digest_viewed" not in st.session_state:
         st.session_state.digest_viewed = False
 
+
+    @st.cache_resource
+    def warm_grok():
+        try:
+            from execution.grok_handler import hybrid_query
+            hybrid_query("ping")
+        except Exception:
+            pass
+
+    warm_grok()
+
+
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
