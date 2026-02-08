@@ -73,11 +73,9 @@ def init_session_state():
     if "digest_viewed" not in st.session_state:
         st.session_state.digest_viewed = False
 
-
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
-
 
 def format_retrieved_memories(documents) -> str:
     """Format retrieved documents for Claude's context."""
@@ -489,18 +487,11 @@ Be helpful, concise, and build on our conversation history."""
                 status_placeholder.empty()
                 
                 # Step 6: Voice output if enabled
-                voice_handler = get_voice_handler()
-                audio = voice_handler.generate_speech(
-                    response,
-                    voice=st.session_state.get("selected_voice", "onyx"),
-                    model=st.session_state.get("tts_model", "tts-1")
-                )
-
-                if audio:
-                    st.audio(audio, format="audio/wav")
-                else:
-                    st.components.v1.html(create_tts_audio(response), height=0)
-
+                if st.session_state.voice_mode:
+                    st.components.v1.html(
+                        create_tts_audio(full_response),
+                        height=0
+                    )
                 
                 # Step 7: Calculate tokens and cost
                 input_tokens = count_tokens_approx(prompt + retrieved_memories)
