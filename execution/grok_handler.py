@@ -7,7 +7,7 @@ logger = logging.getLogger("grok")
 XAI_API_KEY = st.secrets.get("XAI_API_KEY")
 
 GROK_API_URL = "https://api.x.ai/v1/chat/completions"
-GROK_MODEL = "grok-beta"
+GROK_MODEL = "grok-3"
 COST_PER_1K_TOKENS = 0.01
 
 
@@ -29,7 +29,7 @@ def hybrid_query(prompt: str) -> dict:
     if not XAI_API_KEY:
         raise RuntimeError("XAI_API_KEY missing in Streamlit secrets")
 
-    logger.info("✅ Grok triggered")
+    logger.info("✅ Grok triggered (model=grok-3)")
 
     headers = {
         "Authorization": f"Bearer {XAI_API_KEY}",
