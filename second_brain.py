@@ -73,6 +73,10 @@ def init_session_state():
     if "digest_viewed" not in st.session_state:
         st.session_state.digest_viewed = False
 
+     # 🔊 Voice output
+    if "voice_output_enabled" not in st.session_state:
+        st.session_state.voice_output_enabled = False
+
 
     @st.cache_resource
     def warm_grok():
