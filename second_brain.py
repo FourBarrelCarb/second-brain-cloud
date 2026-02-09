@@ -286,15 +286,29 @@ def main():
         
         # Voice Input Toggle
         voice_input = st.toggle(
-        if voice_enabled:
             "Enable Voice Input", 
-            st.success("✓ Voice mode active")
             value=st.session_state.voice_input_enabled,
             help="Use microphone to speak your questions"
         )
-        else:
         st.session_state.voice_input_enabled = voice_input
-            st.info("Voice mode off")
+        
+        # Voice Output Toggle
+        voice_output = st.toggle(
+            "Enable Voice Output",
+            value=st.session_state.voice_output_enabled,
+            help="Athena will speak responses using OpenAI TTS"
+        )
+        st.session_state.voice_output_enabled = voice_output
+        
+        
+        # Voice Output Toggle
+        voice_output = st.toggle(
+            "Enable Voice Output",
+            value=st.session_state.voice_output_enabled,
+            help="Athena will speak responses using OpenAI TTS"
+        )
+        st.divider()
+        st.session_state.voice_output_enabled = voice_output
         
         
         # Voice Output Toggle
