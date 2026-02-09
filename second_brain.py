@@ -298,6 +298,70 @@ def main():
         
         # Display alerts
         display_alerts()
+
+               # Voice Output Toggle
+        voice_output = st.toggle(
+            "Enable Voice Output",
+            value=st.session_state.voice_output_enabled,
+            help="Athena will speak responses using OpenAI TTS"
+        )
+        st.divider()
+        st.session_state.voice_output_enabled = voice_output
+        
+        
+        # Voice Selection (only show if output enabled)
+        if voice_output:
+            st.markdown("**Voice Selection:**")
+            
+            voice_options = {
+                "Onyx (Deep male)": "onyx",
+                "Alloy (Neutral)": "alloy",
+                "Echo (Male)": "echo",
+                "Fable (British male)": "fable",
+                "Nova (Female)": "nova",
+                "Shimmer (Soft female)": "shimmer"
+            }
+            
+            selected_voice_label = st.selectbox(
+                "Choose voice",
+                options=list(voice_options.keys()),
+                index=0,
+                label_visibility="collapsed"
+            )
+            st.session_state.selected_voice = voice_options[selected_voice_label]
+            
+            # TTS Model Selection
+            tts_model = st.radio(
+                "Quality",
+                options=["tts-1 (Standard)", "tts-1-hd (High quality)"],
+                index=0 if st.session_state.tts_model == "tts-1" else 1,
+                help="HD quality costs 2x but sounds better"
+            )
+            st.session_state.tts_model = "tts-1-hd" if "hd" in tts_model.lower() else "tts-1"
+            
+            # Test Voice Button
+            if st.button("🔊 Test Voice", use_container_width=True):
+                test_text = "Hello! This is how I sound. I'm Athena, your AI assistant with perfect memory."
+                voice_handler = get_voice_handler()
+                
+                with st.spinner("Generating test..."):
+                    audio = voice_handler.generate_speech(
+                        test_text,
+                        st.session_state.selected_voice,
+                        st.session_state.tts_model
+                    )
+                    if audio:
+                        st.audio(audio, format="audio/wav")
+        
+        # Display alerts
+        # Status indicators
+        display_alerts()
+        if voice_input:
+            st.success("✓ Voice input active")
+        if voice_output:
+            st.success("✓ Voice output active")
+        if not voice_input and not voice_output:
+            st.info("Voice features disabled")
         
         st.divider()
         
