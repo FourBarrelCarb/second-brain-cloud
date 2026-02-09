@@ -297,11 +297,6 @@ def main():
             help="Turn on voice input and output"
         )
         st.session_state.voice_mode = voice_enabled
-        
-        if voice_enabled:
-            st.success("✓ Voice mode active")
-        else:
-            st.info("Voice mode off")
 
         # Voice Output Toggle
         voice_output = st.toggle(
