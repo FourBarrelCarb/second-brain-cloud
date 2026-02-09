@@ -297,11 +297,6 @@ def main():
             st.success("✓ Voice mode active")
         else:
             st.info("Voice mode off")
-        
-        st.divider()
-        
-        # Display alerts
-        display_alerts()
 
         	
         st.subheader("🔊 Voice Output")
@@ -346,6 +341,11 @@ def main():
         st.session_state.messages.append(
             {"role": "assistant", "content": response}
         )
+
+        st.divider()
+        
+        # Display alerts
+        display_alerts()
         
         st.divider()
         
