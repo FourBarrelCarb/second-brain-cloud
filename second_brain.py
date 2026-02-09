@@ -303,6 +303,14 @@ def main():
             value=st.session_state.voice_output_enabled,
             help="Athena will speak responses using OpenAI TTS"
         )
+        
+        
+        # Voice Output Toggle
+        voice_output = st.toggle(
+            "Enable Voice Output",
+            value=st.session_state.voice_output_enabled,
+            help="Athena will speak responses using OpenAI TTS"
+        )
         st.divider()
         st.session_state.voice_output_enabled = voice_output
         
