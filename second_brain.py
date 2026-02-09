@@ -351,12 +351,10 @@ def main():
                         st.audio(audio, format="audio/wav")
         
         # Status indicators
-    if st.session_state.voice_mode:
-        st.success("✓ Voice input active")
-    if st.session_state.voice_output_enabled:
-        st.success("✓ Voice output active")
-    if not st.session_state.voice_mode and not st.session_state.voice_output_enabled:
-        st.info("Voice features disabled")
+        if st.session_state.voice_mode:
+            st.success("✓ Voice input active")
+        if st.session_state.voice_output_enabled:
+            st.success("✓ Voice output active")
 
                 
         st.divider()
