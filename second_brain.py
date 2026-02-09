@@ -283,6 +283,29 @@ def main():
         st.metric("Total Cost", f"${total_cost:.4f}")
         
         st.divider()
+
+        # Voice Mode Toggle
+        st.subheader("🎙️ Voice Settings")
+        st.subheader("🎤 Voice Mode")
+        voice_enabled = st.toggle(
+            "Enable Voice",
+            value=st.session_state.voice_mode,
+            help="Turn on voice input and output"
+        )
+        st.session_state.voice_mode = voice_enabled
+        
+        
+        # Voice Input Toggle
+        voice_input = st.toggle(
+        if voice_enabled:
+            "Enable Voice Input", 
+            st.success("✓ Voice mode active")
+            value=st.session_state.voice_input_enabled,
+            help="Use microphone to speak your questions"
+        )
+        else:
+        st.session_state.voice_input_enabled = voice_input
+            st.info("Voice mode off")
         
         st.divider()
         
