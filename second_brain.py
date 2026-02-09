@@ -286,7 +286,7 @@ def main():
         
         # Voice Input Toggle
         voice_input = st.toggle(
-        if voice_enabled:
+        if voice_input:
             "Enable Voice Input", 
             st.success("✓ Voice mode active")
             value=st.session_state.voice_input_enabled,
