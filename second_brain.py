@@ -362,12 +362,7 @@ def main():
             st.success("✓ Voice output active")
         if not voice_input and not voice_output:
             st.info("Voice features disabled")
-        
-        st.divider()
-        
-        # Display alerts
-        display_alerts()
-        
+                
         st.divider()
         
         # Actions
