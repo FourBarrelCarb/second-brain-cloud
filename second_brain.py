@@ -284,6 +284,9 @@ def main():
         
         st.divider()
         
+        # Voice Settings
+        st.subheader("🎙️ Voice Settings")
+        
         # Voice Input Toggle
         voice_input = st.toggle(
             "Enable Voice Input", 
@@ -299,35 +302,6 @@ def main():
             help="Athena will speak responses using OpenAI TTS"
         )
         st.session_state.voice_output_enabled = voice_output
-        
-        
-        # Voice Output Toggle
-        voice_output = st.toggle(
-            "Enable Voice Output",
-            value=st.session_state.voice_output_enabled,
-            help="Athena will speak responses using OpenAI TTS"
-        )
-        st.divider()
-        st.session_state.voice_output_enabled = voice_output
-        
-        
-        # Voice Output Toggle
-        voice_output = st.toggle(
-            "Enable Voice Output",
-            value=st.session_state.voice_output_enabled,
-            help="Athena will speak responses using OpenAI TTS"
-        )
-        
-        
-        # Voice Output Toggle
-        voice_output = st.toggle(
-            "Enable Voice Output",
-            value=st.session_state.voice_output_enabled,
-            help="Athena will speak responses using OpenAI TTS"
-        )
-        st.divider()
-        st.session_state.voice_output_enabled = voice_output
-        
         
         # Voice Selection (only show if output enabled)
         if voice_output:
@@ -373,20 +347,13 @@ def main():
                     if audio:
                         st.audio(audio, format="audio/wav")
         
-        # Display alerts
         # Status indicators
-        display_alerts()
         if voice_input:
             st.success("✓ Voice input active")
         if voice_output:
             st.success("✓ Voice output active")
         if not voice_input and not voice_output:
             st.info("Voice features disabled")
-
-        st.divider()
-        
-        # Display alerts
-     #   display_alerts()
         
         st.divider()
         
