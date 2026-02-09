@@ -298,6 +298,50 @@ def main():
         
         # Display alerts
         display_alerts()
+
+        	
+        st.subheader("🔊 Voice Output")
+        st.session_state.voice_output_enabled = st.toggle(
+            "Enable Voice Output",
+            value=st.session_state.voice_output_enabled
+        )
+        if st.session_state.voice_mode:
+            st.success("✓ Voice input active")
+        if st.session_state.voice_output_enabled:
+            st.success("✓ Voice output active")
+        if not st.session_state.voice_mode and not st.session_state.voice_output_enabled:
+            st.info("Voice disabled")
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+    prompt = (
+        process_voice_input()
+        if st.session_state.voice_mode
+        else st.chat_input("Ask me anything...")
+    )
+    if not prompt:
+        return
+    st.session_state.turn_number += 1
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("assistant"):
+        response = ""
+        client = get_claude_client()
+        for chunk in client.chat_stream(
+            messages=[{"role": "user", "content": prompt}],
+            system_prompt="You are Athena."
+        ):
+            response += chunk
+            st.markdown(response + "▌")
+        st.markdown(response)
+        # 🔊 VOICE OUTPUT (FIXED)
+        if st.session_state.voice_output_enabled:
+            st.components.v1.html(
+                create_tts_audio(response),
+                height=0
+            )
+        st.session_state.messages.append(
+            {"role": "assistant", "content": response}
+        )
         
         st.divider()
         
