@@ -284,68 +284,87 @@ def main():
         
         st.divider()
         
-        # Voice Mode Toggle
-        st.subheader("🎤 Voice Mode")
-        voice_enabled = st.toggle(
-            "Enable Voice", 
-            value=st.session_state.voice_mode,
-            help="Turn on voice input and output"
-        )
-        st.session_state.voice_mode = voice_enabled
-        
+        # Voice Input Toggle
+        voice_input = st.toggle(
         if voice_enabled:
+            "Enable Voice Input", 
             st.success("✓ Voice mode active")
+            value=st.session_state.voice_input_enabled,
+            help="Use microphone to speak your questions"
+        )
         else:
+        st.session_state.voice_input_enabled = voice_input
             st.info("Voice mode off")
-
-        	
-        st.subheader("🔊 Voice Output")
-        st.session_state.voice_output_enabled = st.toggle(
+        
+        
+        # Voice Output Toggle
+        voice_output = st.toggle(
             "Enable Voice Output",
-            value=st.session_state.voice_output_enabled
+            value=st.session_state.voice_output_enabled,
+            help="Athena will speak responses using OpenAI TTS"
         )
-        if st.session_state.voice_mode:
-            st.success("✓ Voice input active")
-        if st.session_state.voice_output_enabled:
-            st.success("✓ Voice output active")
-        if not st.session_state.voice_mode and not st.session_state.voice_output_enabled:
-            st.info("Voice disabled")
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-    prompt = (
-        process_voice_input()
-        if st.session_state.voice_mode
-        else st.chat_input("Ask me anything...")
-    )
-    if not prompt:
-        return
-    st.session_state.turn_number += 1
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("assistant"):
-        response = ""
-        client = get_claude_client()
-        for chunk in client.chat_stream(
-            messages=[{"role": "user", "content": prompt}],
-            system_prompt="You are Athena."
-        ):
-            response += chunk
-            st.markdown(response + "▌")
-        st.markdown(response)
-        # 🔊 VOICE OUTPUT (FIXED)
-        if st.session_state.voice_output_enabled:
-            st.components.v1.html(
-                create_tts_audio(response),
-                height=0
+        st.divider()
+        st.session_state.voice_output_enabled = voice_output
+        
+        
+        # Voice Selection (only show if output enabled)
+        if voice_output:
+            st.markdown("**Voice Selection:**")
+            
+            voice_options = {
+                "Onyx (Deep male)": "onyx",
+                "Alloy (Neutral)": "alloy",
+                "Echo (Male)": "echo",
+                "Fable (British male)": "fable",
+                "Nova (Female)": "nova",
+                "Shimmer (Soft female)": "shimmer"
+            }
+            
+            selected_voice_label = st.selectbox(
+                "Choose voice",
+                options=list(voice_options.keys()),
+                index=0,
+                label_visibility="collapsed"
             )
-        st.session_state.messages.append(
-            {"role": "assistant", "content": response}
-        )
+            st.session_state.selected_voice = voice_options[selected_voice_label]
+            
+            # TTS Model Selection
+            tts_model = st.radio(
+                "Quality",
+                options=["tts-1 (Standard)", "tts-1-hd (High quality)"],
+                index=0 if st.session_state.tts_model == "tts-1" else 1,
+                help="HD quality costs 2x but sounds better"
+            )
+            st.session_state.tts_model = "tts-1-hd" if "hd" in tts_model.lower() else "tts-1"
+            
+            # Test Voice Button
+            if st.button("🔊 Test Voice", use_container_width=True):
+                test_text = "Hello! This is how I sound. I'm Athena, your AI assistant with perfect memory."
+                voice_handler = get_voice_handler()
+                
+                with st.spinner("Generating test..."):
+                    audio = voice_handler.generate_speech(
+                        test_text,
+                        st.session_state.selected_voice,
+                        st.session_state.tts_model
+                    )
+                    if audio:
+                        st.audio(audio, format="audio/wav")
+        
+        # Display alerts
+        # Status indicators
+        display_alerts()
+        if voice_input:
+            st.success("✓ Voice input active")
+        if voice_output:
+            st.success("✓ Voice output active")
+        if not voice_input and not voice_output:
+            st.info("Voice features disabled")
 
         st.divider()
         
         # Display alerts
-        display_alerts()
+     #   display_alerts()
         
         st.divider()
         
