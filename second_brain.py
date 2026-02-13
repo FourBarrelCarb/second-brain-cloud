@@ -13,12 +13,10 @@ import logging
 from execution.retrieve_chats import hybrid_retrieve
 from execution.save_conversation import save_conversation
 from execution.call_claude import get_claude_client
-from execution.voice_handler import get_voice_handler, create_tts_audio
+from execution.voice_handler import get_voice_handler, creaate_tts_audio
 from execution.audio_recorder import audio_recorder_component
 from execution.grok_handler import hybrid_query
 from execution.insights_engine import get_insights_engine
-from execution.grok_handler import hybrid_query
-
 
 # Setup logging
 logging.basicConfig(
@@ -465,23 +463,6 @@ def main():
         # Display user message
         with st.chat_message("user"):
             st.markdown(prompt)
-
-        grok_result = hybrid_query(prompt)
-
-        # ------------------------------------------
-        # BLOCK IF REAL-TIME REQUIRED BUT FAILED
-        # ------------------------------------------
-        if grok_result.get("requires_live") and not grok_result.get("grok_data"):
-            st.warning("Real-time market data is currently unavailable. Please check your brokerage platform.")
-        return
-
-        # ------------------------------------------
-        # IF GROK SUCCESSFUL
-        # ------------------------------------------
-        if grok_result.get("grok_data"):
-            full_response = grok_result["grok_data"]
-            st.markdown(full_response)
-        return
         
         # Generate assistant response
         with st.chat_message("assistant"):
