@@ -21,7 +21,7 @@ class GrokClient:
                 api_key=st.secrets["XAI_API_KEY"],
                 base_url="https://api.x.ai/v1"
             )
-            self.model = "grok-beta"
+            self.model = "grok-3"
             logger.info("✓ Grok client initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Grok client: {e}")
