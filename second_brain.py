@@ -472,8 +472,11 @@ def main():
             
             try:
                 # Step 1: Check if we should use Grok
+                logger.info(f"[DEBUG] Calling hybrid_query with prompt: {prompt[:80]}")
                 grok_result = hybrid_query(prompt)
-                
+                logger.info(f"[DEBUG] hybrid_query returned: {grok_result}")
+                st.toast(f"Grok routing: use_grok={grok_result['use_grok']}, error={grok_result.get('error', 'none')}")
+
                 if grok_result["use_grok"]:
                     status_placeholder.info("🔍 Fetching real-time data from Grok...")
                     grok_data = grok_result["grok_data"]
