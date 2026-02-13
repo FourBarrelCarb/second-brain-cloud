@@ -252,6 +252,7 @@ def main():
     """Main Streamlit application."""
     
     init_session_state()
+    st.cache_resource.clear()  # TEMPORARY: force reload of cached clients
     warm_grok()
 
     # Check for weekly digest generation
