@@ -12,10 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 class GrokClient:
-    """Wrapper for XAI Grok API with smart query routing."""
-    
+    """Wrapper for XAI Grok API with enforced real-time routing."""
+
     def __init__(self):
-        """Initialize XAI client."""
         try:
             self.client = openai.OpenAI(
                 api_key=st.secrets["XAI_API_KEY"],
@@ -26,25 +25,55 @@ class GrokClient:
         except Exception as e:
             logger.error(f"Failed to initialize Grok client: {e}")
             raise
-    
+
+    # ------------------------------------------------------------------
+    # STRICT REAL-TIME DETECTION
+    # ------------------------------------------------------------------
+
+    def requires_real_time(self, query: str) -> bool:
+        """
+        Determine if the query requires live data.
+        This is STRICT. If True, Claude must not answer.
+        """
+
+        query_lower = query.lower()
+
+        financial_keywords = [
+            "current price",
+            "stock price",
+            "price of",
+            "trading at",
+            "market cap",
+            "earnings today",
+            "dividend yield",
+            "ticker",
+            "latest price",
+            "right now",
+            "today's price"
+        ]
+
+        for keyword in financial_keywords:
+            if keyword in query_lower:
+                logger.info(f"Real-time financial query detected: '{keyword}'")
+                return True
+
+        return False
+
+    # ------------------------------------------------------------------
+    # GROK QUERY
+    # ------------------------------------------------------------------
+
     def query_grok(self, prompt: str, max_tokens: int = 500) -> Optional[Dict[str, Any]]:
-        """
-        Send query to Grok and get real-time response.
-        
-        Args:
-            prompt: User query
-            max_tokens: Maximum tokens in response
-            
-        Returns:
-            Dict with response text and token usage, or None on error
-        """
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are Grok, providing real-time market data and current information. Be concise and factual. Include current prices, dates, and sources when relevant."
+                        "content": (
+                            "You are Grok, providing real-time market data. "
+                            "Be concise and factual. Include dates when giving prices."
+                        )
                     },
                     {
                         "role": "user",
@@ -52,124 +81,87 @@ class GrokClient:
                     }
                 ],
                 max_tokens=max_tokens,
-                temperature=0.3  # Lower for factual responses
+                temperature=0.2
             )
-            
+
             result = {
                 "text": response.choices[0].message.content,
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
                 "total_tokens": response.usage.total_tokens
             }
-            
+
             logger.info(f"✓ Grok query successful: {result['total_tokens']} tokens")
             return result
-            
+
         except Exception as e:
             logger.error(f"Grok API error: {e}", exc_info=True)
             return None
-    
-    def should_use_grok(self, query: str) -> bool:
-        """
-        Determine if query should be routed to Grok based on keywords.
-        
-        Args:
-            query: User's question
-            
-        Returns:
-            True if Grok should handle it, False for Claude only
-        """
-        query_lower = query.lower()
-        
-        # Real-time/current data triggers
-        time_triggers = [
-            "current", "latest", "today", "now", "recent",
-            "this week", "this month", "breaking"
-        ]
-        
-        # Financial data triggers
-        financial_triggers = [
-            "price", "stock price", "market cap", "trading at",
-            "earnings", "dividend", "p/e", "pe ratio",
-            "volume", "market", "ticker"
-        ]
-        
-        # News triggers
-        news_triggers = [
-            "news", "announcement", "announced", "reported",
-            "earnings report", "press release"
-        ]
-        
-        # Check if any triggers are present
-        all_triggers = time_triggers + financial_triggers + news_triggers
-        
-        for trigger in all_triggers:
-            if trigger in query_lower:
-                logger.info(f"Grok trigger detected: '{trigger}'")
-                return True
-        
-        return False
-    
-    def estimate_cost(self, tokens: int) -> float:
-        """
-        Estimate cost for Grok API usage.
-        
-        Args:
-            tokens: Total tokens used
-            
-        Returns:
-            Estimated cost in USD
-        """
-        # Grok pricing: ~$5 per 1M tokens (estimate)
-        cost = (tokens / 1_000_000) * 5.00
-        return cost
 
+    # ------------------------------------------------------------------
+    # COST ESTIMATION
+    # ------------------------------------------------------------------
+
+    def estimate_cost(self, tokens: int) -> float:
+        return (tokens / 1_000_000) * 5.00
+
+
+# ----------------------------------------------------------------------
+# GLOBAL CLIENT
+# ----------------------------------------------------------------------
 
 @st.cache_resource
 def get_grok_client():
-    """Get or create the global Grok client instance."""
     return GrokClient()
 
 
-def hybrid_query(user_query: str, athena_context: str = "") -> Dict[str, Any]:
+# ----------------------------------------------------------------------
+# HYBRID QUERY (ENFORCED VERSION)
+# ----------------------------------------------------------------------
+
+def hybrid_query(user_query: str) -> Dict[str, Any]:
     """
-    Execute hybrid query using both Grok and Claude.
-    
-    Args:
-        user_query: User's question
-        athena_context: Relevant context from Athena's memory
-        
-    Returns:
-        Dict with grok_data, should_synthesize flag, and metadata
+    Enforced routing logic:
+    - If query requires real-time → MUST use Grok
+    - If Grok fails → BLOCK response
     """
+
     grok = get_grok_client()
-    
-    # Check if we should use Grok
-    if not grok.should_use_grok(user_query):
+
+    requires_live = grok.requires_real_time(user_query)
+
+    # --------------------------------------------------------------
+    # Case 1: Does NOT require live data
+    # --------------------------------------------------------------
+    if not requires_live:
         return {
+            "requires_live": False,
             "use_grok": False,
             "grok_data": None,
             "cost": 0.0
         }
-    
-    # Query Grok for real-time data
-    logger.info("Routing query to Grok for real-time data...")
+
+    # --------------------------------------------------------------
+    # Case 2: Requires live data → MUST use Grok
+    # --------------------------------------------------------------
+    logger.info("Real-time query detected. Routing to Grok...")
+
     grok_response = grok.query_grok(user_query)
-    
+
     if not grok_response:
-        logger.warning("Grok query failed, falling back to Claude only")
+        logger.error("Grok failed — blocking real-time response.")
+
         return {
-            "use_grok": False,
+            "requires_live": True,
+            "use_grok": True,
             "grok_data": None,
+            "error": "Real-time data unavailable",
             "cost": 0.0
         }
-    
-    # Calculate cost
+
     cost = grok.estimate_cost(grok_response["total_tokens"])
-    
+
     return {
+        "requires_live": True,
         "use_grok": True,
         "grok_data": grok_response["text"],
-        "tokens": grok_response["total_tokens"],
         "cost": cost
     }
