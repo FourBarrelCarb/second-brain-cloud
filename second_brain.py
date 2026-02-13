@@ -13,7 +13,7 @@ import logging
 from execution.retrieve_chats import hybrid_retrieve
 from execution.save_conversation import save_conversation
 from execution.call_claude import get_claude_client
-from execution.voice_handler import get_voice_handler, creaate_tts_audio
+from execution.voice_handler import get_voice_handler, create_tts_audio
 from execution.audio_recorder import audio_recorder_component
 from execution.grok_handler import hybrid_query
 from execution.insights_engine import get_insights_engine
@@ -77,21 +77,21 @@ def init_session_state():
     # Grok cost tracking
     if "grok_cost" not in st.session_state:
         st.session_state.grok_cost = 0.0
-    
+
     # Insights state
     if "digest_viewed" not in st.session_state:
         st.session_state.digest_viewed = False
 
 
-    @st.cache_resource
-    def warm_grok():
-        try:
-            from execution.grok_handler import hybrid_query
-            hybrid_query("ping")
-        except Exception:
-            pass
-
-    warm_grok()
+@st.cache_resource
+def warm_grok():
+    """Pre-initialize Grok client (runs once via cache)."""
+    try:
+        from execution.grok_handler import get_grok_client
+        get_grok_client()
+        logger.info("✓ Grok client warmed up")
+    except Exception as e:
+        logger.warning(f"Grok warmup failed: {e}")
 
 
 # =============================================================================
@@ -252,7 +252,8 @@ def main():
     """Main Streamlit application."""
     
     init_session_state()
-    
+    warm_grok()
+
     # Check for weekly digest generation
     check_and_generate_digest()
     
@@ -477,6 +478,9 @@ def main():
                     status_placeholder.info("🔍 Fetching real-time data from Grok...")
                     grok_data = grok_result["grok_data"]
                     st.session_state.grok_cost += grok_result["cost"]
+                elif grok_result.get("error"):
+                    status_placeholder.warning(f"⚠️ Grok trigger matched but failed: {grok_result['error']}")
+                    grok_data = None
                 else:
                     grok_data = None
                 
