@@ -12,68 +12,39 @@ logger = logging.getLogger(__name__)
 
 
 class GrokClient:
-    """Wrapper for XAI Grok API with enforced real-time routing."""
-
+    """Wrapper for XAI Grok API with smart query routing."""
+    
     def __init__(self):
+        """Initialize XAI client."""
         try:
             self.client = openai.OpenAI(
                 api_key=st.secrets["XAI_API_KEY"],
                 base_url="https://api.x.ai/v1"
             )
-            self.model = "grok-3"
+            self.model = "grok-beta"
             logger.info("✓ Grok client initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Grok client: {e}")
             raise
-
-    # ------------------------------------------------------------------
-    # STRICT REAL-TIME DETECTION
-    # ------------------------------------------------------------------
-
-    def requires_real_time(self, query: str) -> bool:
-        """
-        Determine if the query requires live data.
-        This is STRICT. If True, Claude must not answer.
-        """
-
-        query_lower = query.lower()
-
-        financial_keywords = [
-            "current price",
-            "stock price",
-            "price of",
-            "trading at",
-            "market cap",
-            "earnings today",
-            "dividend yield",
-            "ticker",
-            "latest price",
-            "right now",
-            "today's price"
-        ]
-
-        for keyword in financial_keywords:
-            if keyword in query_lower:
-                logger.info(f"Real-time financial query detected: '{keyword}'")
-                return True
-
-        return False
-
-    # ------------------------------------------------------------------
-    # GROK QUERY
-    # ------------------------------------------------------------------
-
+    
     def query_grok(self, prompt: str, max_tokens: int = 500) -> Optional[Dict[str, Any]]:
+        """
+        Send query to Grok and get real-time response.
+        
+        Args:
+            prompt: User query
+            max_tokens: Maximum tokens in response
+            
+        Returns:
+            Dict with response text and token usage, or None on error
+        """
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": (
-                            "You are Grok, providing real-time market data. "
-                            "Be concise and factual. Include dates when giving prices."
-                        )
+                        "content": "You are Grok, providing real-time market data and current information. Be concise and factual. Include current prices, dates, and sources when relevant."
                     },
                     {
                         "role": "user",
@@ -81,87 +52,157 @@ class GrokClient:
                     }
                 ],
                 max_tokens=max_tokens,
-                temperature=0.2
+                temperature=0.3  # Lower for factual responses
             )
-
+            
             result = {
                 "text": response.choices[0].message.content,
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
                 "total_tokens": response.usage.total_tokens
             }
-
+            
             logger.info(f"✓ Grok query successful: {result['total_tokens']} tokens")
             return result
-
+            
         except Exception as e:
             logger.error(f"Grok API error: {e}", exc_info=True)
             return None
+    
+    def should_use_grok(self, query: str) -> bool:
+        """
+        Determine if query should be routed to Grok based on keywords.
 
-    # ------------------------------------------------------------------
-    # COST ESTIMATION
-    # ------------------------------------------------------------------
+        Args:
+            query: User's question
 
+        Returns:
+            True if Grok should handle it, False for Claude only
+        """
+        query_lower = query.lower().strip()
+
+        # Explicit Grok routing - user forces it
+        explicit_triggers = [
+            "grok", "ask grok", "use grok", "real-time", "realtime",
+            "real time", "live data", "look up", "search for"
+        ]
+
+        # Real-time/current data triggers
+        time_triggers = [
+            "current", "currently", "latest", "today", "right now",
+            "now", "recent", "recently", "this week", "this month",
+            "breaking", "up to date", "up-to-date", "as of"
+        ]
+
+        # Financial data triggers
+        financial_triggers = [
+            "price", "stock price", "stock", "market cap", "trading at",
+            "earnings", "dividend", "p/e", "pe ratio", "share price",
+            "volume", "market", "ticker", "crypto", "bitcoin", "btc",
+            "eth", "ethereum", "forex", "exchange rate", "s&p",
+            "nasdaq", "dow jones", "index"
+        ]
+
+        # News triggers
+        news_triggers = [
+            "news", "announcement", "announced", "reported",
+            "earnings report", "press release", "headline",
+            "what happened", "what's happening", "update on"
+        ]
+
+        # Weather / sports / live events
+        live_triggers = [
+            "weather", "forecast", "score", "game", "match",
+            "election", "results"
+        ]
+
+        all_triggers = (
+            explicit_triggers + time_triggers + financial_triggers
+            + news_triggers + live_triggers
+        )
+
+        for trigger in all_triggers:
+            if trigger in query_lower:
+                logger.info(f"Grok trigger detected: '{trigger}' in query: {query_lower[:80]}")
+                return True
+
+        logger.debug(f"No Grok trigger matched for: {query_lower[:80]}")
+        return False
+    
     def estimate_cost(self, tokens: int) -> float:
-        return (tokens / 1_000_000) * 5.00
+        """
+        Estimate cost for Grok API usage.
+        
+        Args:
+            tokens: Total tokens used
+            
+        Returns:
+            Estimated cost in USD
+        """
+        # Grok pricing: ~$5 per 1M tokens (estimate)
+        cost = (tokens / 1_000_000) * 5.00
+        return cost
 
-
-# ----------------------------------------------------------------------
-# GLOBAL CLIENT
-# ----------------------------------------------------------------------
 
 @st.cache_resource
 def get_grok_client():
+    """Get or create the global Grok client instance."""
     return GrokClient()
 
 
-# ----------------------------------------------------------------------
-# HYBRID QUERY (ENFORCED VERSION)
-# ----------------------------------------------------------------------
-
-def hybrid_query(user_query: str) -> Dict[str, Any]:
+def hybrid_query(user_query: str, athena_context: str = "") -> Dict[str, Any]:
     """
-    Enforced routing logic:
-    - If query requires real-time → MUST use Grok
-    - If Grok fails → BLOCK response
+    Execute hybrid query using both Grok and Claude.
+
+    Args:
+        user_query: User's question
+        athena_context: Relevant context from Athena's memory
+
+    Returns:
+        Dict with grok_data, should_synthesize flag, and metadata
     """
-
-    grok = get_grok_client()
-
-    requires_live = grok.requires_real_time(user_query)
-
-    # --------------------------------------------------------------
-    # Case 1: Does NOT require live data
-    # --------------------------------------------------------------
-    if not requires_live:
+    try:
+        grok = get_grok_client()
+    except Exception as e:
+        logger.error(f"Grok client unavailable: {e}")
         return {
-            "requires_live": False,
+            "use_grok": False,
+            "grok_data": None,
+            "cost": 0.0,
+            "error": f"Grok client init failed: {e}"
+        }
+
+    # Check if we should use Grok
+    should_use = grok.should_use_grok(user_query)
+    logger.info(f"should_use_grok('{user_query[:60]}') = {should_use}")
+
+    if not should_use:
+        return {
             "use_grok": False,
             "grok_data": None,
             "cost": 0.0
         }
 
-    # --------------------------------------------------------------
-    # Case 2: Requires live data → MUST use Grok
-    # --------------------------------------------------------------
-    logger.info("Real-time query detected. Routing to Grok...")
-
+    # Query Grok for real-time data
+    logger.info("Routing query to Grok for real-time data...")
     grok_response = grok.query_grok(user_query)
 
     if not grok_response:
-        logger.error("Grok failed — blocking real-time response.")
-
+        logger.warning("Grok query FAILED — trigger matched but API returned None")
         return {
-            "requires_live": True,
-            "use_grok": True,
+            "use_grok": False,
             "grok_data": None,
-            "error": "Real-time data unavailable",
-            "cost": 0.0
+            "cost": 0.0,
+            "error": "Grok API call failed (check XAI_API_KEY and network)"
         }
 
+    # Calculate cost
     cost = grok.estimate_cost(grok_response["total_tokens"])
 
+    logger.info(f"✓ Grok returned {grok_response['total_tokens']} tokens, cost ${cost:.4f}")
     return {
-        "requires_live": True,
         "use_grok": True,
         "grok_data": grok_response["text"],
+        "tokens": grok_response["total_tokens"],
         "cost": cost
     }
