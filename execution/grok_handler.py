@@ -67,7 +67,7 @@ class GrokClient:
             
         except Exception as e:
             logger.error(f"Grok API error: {e}", exc_info=True)
-            return None
+            return {"error": str(e)}
     
     def should_use_grok(self, query: str) -> bool:
         """
@@ -187,13 +187,14 @@ def hybrid_query(user_query: str, athena_context: str = "") -> Dict[str, Any]:
     logger.info("Routing query to Grok for real-time data...")
     grok_response = grok.query_grok(user_query)
 
-    if not grok_response:
-        logger.warning("Grok query FAILED — trigger matched but API returned None")
+    if not grok_response or "error" in grok_response:
+        api_error = grok_response.get("error", "Unknown") if isinstance(grok_response, dict) else "No response"
+        logger.warning(f"Grok query FAILED — {api_error}")
         return {
             "use_grok": False,
             "grok_data": None,
             "cost": 0.0,
-            "error": "Grok API call failed (check XAI_API_KEY and network)"
+            "error": f"Grok API: {api_error}"
         }
 
     # Calculate cost
