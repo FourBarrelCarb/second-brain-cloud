@@ -1,136 +1,175 @@
-import requests
-import logging
-import re
+"""
+Grok Handler - XAI API Integration
+Handles real-time market data queries via Grok
+"""
+
 import streamlit as st
+import openai
+import logging
+from typing import Optional, Dict, Any
 
-logger = logging.getLogger("grok")
-
-# -------------------------------------------------------------------
-# CONFIG
-# -------------------------------------------------------------------
-
-XAI_API_KEY = st.secrets.get("XAI_API_KEY")
-
-GROK_API_URL = "https://api.x.ai/v1/chat/completions"
-GROK_MODEL = "grok-3"
-
-# Rough estimate – adjust if xAI publishes exact pricing
-COST_PER_1K_TOKENS = 0.01
+logger = logging.getLogger(__name__)
 
 
-# -------------------------------------------------------------------
-# ROUTING LOGIC
-# -------------------------------------------------------------------
+class GrokClient:
+    """Wrapper for XAI Grok API with smart query routing."""
+    
+    def __init__(self):
+        """Initialize XAI client."""
+        try:
+            self.client = openai.OpenAI(
+                api_key=st.secrets["XAI_API_KEY"],
+                base_url="https://api.x.ai/v1"
+            )
+            self.model = "grok-3"
+            logger.info("✓ Grok client initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Grok client: {e}")
+            raise
+    
+    def query_grok(self, prompt: str, max_tokens: int = 500) -> Optional[Dict[str, Any]]:
+        """
+        Send query to Grok and get real-time response.
+        
+        Args:
+            prompt: User query
+            max_tokens: Maximum tokens in response
+            
+        Returns:
+            Dict with response text and token usage, or None on error
+        """
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are Grok, providing real-time market data and current information. Be concise and factual. Include current prices, dates, and sources when relevant."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=max_tokens,
+                temperature=0.3  # Lower for factual responses
+            )
+            
+            result = {
+                "text": response.choices[0].message.content,
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens
+            }
+            
+            logger.info(f"✓ Grok query successful: {result['total_tokens']} tokens")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Grok API error: {e}", exc_info=True)
+            return None
+    
+    def should_use_grok(self, query: str) -> bool:
+        """
+        Determine if query should be routed to Grok based on keywords.
+        
+        Args:
+            query: User's question
+            
+        Returns:
+            True if Grok should handle it, False for Claude only
+        """
+        query_lower = query.lower()
+        
+        # Real-time/current data triggers
+        time_triggers = [
+            "current", "latest", "today", "now", "recent",
+            "this week", "this month", "breaking"
+        ]
+        
+        # Financial data triggers
+        financial_triggers = [
+            "price", "stock price", "market cap", "trading at",
+            "earnings", "dividend", "p/e", "pe ratio",
+            "volume", "market", "ticker"
+        ]
+        
+        # News triggers
+        news_triggers = [
+            "news", "announcement", "announced", "reported",
+            "earnings report", "press release"
+        ]
+        
+        # Check if any triggers are present
+        all_triggers = time_triggers + financial_triggers + news_triggers
+        
+        for trigger in all_triggers:
+            if trigger in query_lower:
+                logger.info(f"Grok trigger detected: '{trigger}'")
+                return True
+        
+        return False
+    
+    def estimate_cost(self, tokens: int) -> float:
+        """
+        Estimate cost for Grok API usage.
+        
+        Args:
+            tokens: Total tokens used
+            
+        Returns:
+            Estimated cost in USD
+        """
+        # Grok pricing: ~$5 per 1M tokens (estimate)
+        cost = (tokens / 1_000_000) * 5.00
+        return cost
 
-def should_use_grok(prompt: str) -> bool:
+
+@st.cache_resource
+def get_grok_client():
+    """Get or create the global Grok client instance."""
+    return GrokClient()
+
+
+def hybrid_query(user_query: str, athena_context: str = "") -> Dict[str, Any]:
     """
-    Decide if a prompt requires real-time data.
-    This is intentionally aggressive for finance & news.
+    Execute hybrid query using both Grok and Claude.
+    
+    Args:
+        user_query: User's question
+        athena_context: Relevant context from Athena's memory
+        
+    Returns:
+        Dict with grok_data, should_synthesize flag, and metadata
     """
-    p = prompt.lower()
-
-    # Obvious real-time intent
-    if any(k in p for k in [
-        "latest", "today", "current", "now",
-        "breaking", "right now"
-    ]):
-        return True
-
-    # Finance / stock price intent
-    if any(k in p for k in [
-        "stock", "share", "price", "trading",
-        "market cap", "volume", "earnings"
-    ]):
-        return True
-
-    # Ticker symbol detection (AMD, NVDA, AAPL, etc.)
-    if re.search(r"\b[A-Z]{2,5}\b", prompt):
-        return True
-
-    return False
-
-
-# -------------------------------------------------------------------
-# MAIN ENTRY
-# -------------------------------------------------------------------
-
-def hybrid_query(prompt: str) -> dict:
-    """
-    If needed, call Grok for real-time data.
-    Returns a dict consumed by the main app.
-    """
-
-    use_grok = should_use_grok(prompt)
-
-    if not use_grok:
+    grok = get_grok_client()
+    
+    # Check if we should use Grok
+    if not grok.should_use_grok(user_query):
         return {
             "use_grok": False,
             "grok_data": None,
             "cost": 0.0
         }
-
-    if not XAI_API_KEY:
-        raise RuntimeError("XAI_API_KEY missing in Streamlit secrets")
-
-    logger.info("✅ Grok triggered for real-time query")
-
-    headers = {
-        "Authorization": f"Bearer {XAI_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    # IMPORTANT: we explicitly instruct Grok to return numbers when relevant
-    payload = {
-        "model": GROK_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are a real-time market data assistant. "
-                    "If asked for prices, return the latest numeric value "
-                    "with currency and timestamp if available."
-                )
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        "temperature": 0.1
-    }
-
-    resp = requests.post(
-        GROK_API_URL,
-        headers=headers,
-        json=payload,
-        timeout=30
-    )
-
-    if resp.status_code != 200:
-        raise RuntimeError(
-            f"Grok API error {resp.status_code}: {resp.text}"
-        )
-
-    data = resp.json()
-
-    content = (
-        data.get("choices", [{}])[0]
-        .get("message", {})
-        .get("content", "")
-        .strip()
-    )
-
-    if not content:
-        logger.warning("⚠️ Grok returned empty content")
-
-    usage = data.get("usage", {})
-    tokens = usage.get("total_tokens", 0)
-    cost = (tokens / 1000) * COST_PER_1K_TOKENS
-
-    logger.info(f"✅ Grok success | tokens={tokens} | cost=${cost:.4f}")
-
+    
+    # Query Grok for real-time data
+    logger.info("Routing query to Grok for real-time data...")
+    grok_response = grok.query_grok(user_query)
+    
+    if not grok_response:
+        logger.warning("Grok query failed, falling back to Claude only")
+        return {
+            "use_grok": False,
+            "grok_data": None,
+            "cost": 0.0
+        }
+    
+    # Calculate cost
+    cost = grok.estimate_cost(grok_response["total_tokens"])
+    
     return {
         "use_grok": True,
-        "grok_data": content,
+        "grok_data": grok_response["text"],
+        "tokens": grok_response["total_tokens"],
         "cost": cost
     }
