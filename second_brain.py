@@ -469,19 +469,19 @@ def main():
             st.markdown(prompt)
 
         # ------------------------------------------
-# BLOCK IF REAL-TIME REQUIRED BUT FAILED
-# ------------------------------------------
-if grok_result.get("requires_live") and not grok_result.get("grok_data"):
-    st.warning("Real-time market data is currently unavailable. Please check your brokerage platform.")
-    return
+        # BLOCK IF REAL-TIME REQUIRED BUT FAILED
+        # ------------------------------------------
+        if grok_result.get("requires_live") and not grok_result.get("grok_data"):
+            st.warning("Real-time market data is currently unavailable. Please check your brokerage platform.")
+        return
 
-# ------------------------------------------
-# IF GROK SUCCESSFUL
-# ------------------------------------------
-if grok_result.get("grok_data"):
-    full_response = grok_result["grok_data"]
-    st.markdown(full_response)
-    return
+        # ------------------------------------------
+        # IF GROK SUCCESSFUL
+        # ------------------------------------------
+        if grok_result.get("grok_data"):
+            full_response = grok_result["grok_data"]
+            st.markdown(full_response)
+        return
         
         # Generate assistant response
         with st.chat_message("assistant"):
