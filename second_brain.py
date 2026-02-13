@@ -19,8 +19,6 @@ from execution.grok_handler import hybrid_query
 from execution.insights_engine import get_insights_engine
 from execution.grok_handler import hybrid_query
 
-grok_result = hybrid_query(prompt)
-
 
 # Setup logging
 logging.basicConfig(
@@ -467,6 +465,8 @@ def main():
         # Display user message
         with st.chat_message("user"):
             st.markdown(prompt)
+
+        grok_result = hybrid_query(prompt)
 
         # ------------------------------------------
         # BLOCK IF REAL-TIME REQUIRED BUT FAILED
